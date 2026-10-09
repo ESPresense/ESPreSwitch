@@ -1,0 +1,5 @@
+{
+  "note": "ESPresense esp32c3 factory image from the CI run of ESPresense/ESPresense#2532 (artifacts expire after 90 days); switch to a release asset once one ships factory images",
+  "url": "https://espresense.com/artifacts/download/runs/37950310137/esp32c3.factory.bin",
+  "md5": "4d6a406e59ced6ba17cb50c7958019bf"
+}

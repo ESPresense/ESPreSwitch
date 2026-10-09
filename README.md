@@ -1,8 +1,12 @@
 
-# SwitchbOTA
+# SwitchPresense
 ![switchbot-product-photo](./images/switchbot-product-photo.jpg)
 
-This project helps to replace the default firmware on the SwitchBot Smart Plug Mini via an OTA update, enabling the use of Tasmota open-source firmware without disassembling the device.
+SwitchPresense converts a stock SwitchBot Smart Plug Mini straight to [ESPresense](https://espresense.com) over the air, without disassembling the device. It is a fork of [SwitchbOTA](https://github.com/kendallgoto/switchbota) by Kendall Goto, which does the same for Tasmota.
+
+**Why not go through Tasmota?** SwitchbOTA's route (stock → Tasmota v11.1.0 → ESPresense) leaves the plug on Tasmota's bootloader and partition table forever, and current ESPresense builds (pure ESP-IDF v5.4) have not been proven to boot on that bootloader. SwitchPresense writes an ESPresense *factory image* instead: ESPresense's own bootloader, partition table and app, so the plug ends up laid out like any other ESPresense ESP32-C3 node.
+
+The image it installs is pinned in [`payload.json`](./payload.json) (URL + MD5). The stage binary bakes in that MD5 and size at build time and refuses to build if the image would reach its own partition at `0x220000`.
 
 ## SwitchBot Hardware Details
 
@@ -20,12 +24,14 @@ Some details about the devices are as follows:
 - They are ultrasonically welded shut, requiring destruction of the plastic housing to access the circuits within. There are no screws to allow access to the internals, the way there is with the Sonoff S31
 - They use the Shanghai Belling BL0937 energy measurement IC to track power usage
 - They use the Espressif ESP32-C3 chip for WiFi, Bluetooth Low Energy (BLE), and circuit control. See [here](https://tasmota.github.io/docs/ESP32/#esp32-differences) to learn about the different types of ESP32. The MAC addresses for WiFi and BLE follow the [ESP32 standard](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/api-reference/system/misc_system_api.html#mac-address) of having an offset of two. If the WIFI-MAC is `34:85:18:0F:CC:DC`, then the BLE-MAC is `34:85:18:0F:CC:DE` (DC in hex is 220, DE is 222)
-- The SwitchbOTA flashing process is confirmed to work on both device models using firmware v1.4 or older (v1.3, v1.2)
+- The upstream SwitchbOTA flashing process is confirmed to work on both device models using firmware v1.4 or older (v1.3, v1.2). SwitchPresense uses the same stage binary and triggers, only the payload differs
 
 ## Disclaimer
 Writing to the bootloader over OTA is dangerous and not normally done for good reason. If your device loses power or somehow flashes corrupted data, the device will be bricked and require disassembly to reprogram the device. Only perform this process if you are comfortable disassembling your plug to fix it if it breaks! Of course, do not unplug or otherwise disturb the plug while it is performing the OTA.
 
-**This is a proof of concept and provided with no warranty.**
+**This is a proof of concept and provided with no warranty.** The ESPresense payload has not yet been tested on a stock plug. Try it first on a plug you are prepared to open.
+
+**Already converted a plug via Tasmota?** SwitchPresense needs the stock SwitchBot firmware; it cannot re-run on a plug that already runs Tasmota or ESPresense.
 
 ## Part 1: Plug Setup
 
@@ -54,7 +60,7 @@ Writing to the bootloader over OTA is dangerous and not normally done for good r
 ![pfsense](./images/pfsense-setup.png)
    - In PiHole, this can be done in the Local DNS->DNS Records by setting the Domain to `www.wohand.com` and `wohand.com` and the IP to 192.168.0.69
   - If your router does not support custom DNS entries, it will almost certainly support setting a custom DNS server. This may be found in the DHCP settings or the System settings. Set the custom DNS server to 192.168.0.69
-- Run a local NodeJS server to act in place of the real firmware update server and instead deliver modified firmware files: firstly the OTA file, and then the Tasmota firmware file
+- Run a local NodeJS server to act in place of the real firmware update server and instead deliver modified firmware files: firstly the OTA (stage) file, and then the ESPresense factory image
   - Install NodeJS on your computer https://nodejs.org/en/learn/getting-started/how-to-install-nodejs
   - Using a CLI or Terminal, `cd` into the `server/` directory and run `npm i` (short for `npm install`) to install the dependencies required for this project
   - Once the previous command completes, run `node index.js` to run the server. 
@@ -86,48 +92,16 @@ Writing to the bootloader over OTA is dangerous and not normally done for good r
 - Wait a few seconds and look at the NodeJS log to verify the command worked as it should. You should see something such as `::ffff:192.168.0.131 - /version/wocaotech/firmware/WoPlugUS/WoPlugUS_V12.bin` which indicates the NodeJS server was able to send the first `.bin` file to the plug
 - Wait about a minute after seeing the NodeJS server log to give the plug time to get ready for the next step.
 - Now send a new BYTE_ARRAY command in the BLE app (nRF Connect) with hex `57 0F 0B`. Hit Send to trigger the second and final firmware flash step
-- Wait a few seconds again and then look at the NodeJS log to verify the command worked as it should. You should see something such as `::ffff:192.168.0.131 - /payload.bin` which indicates the NodeJS server was able to send the Tasmota `.bin` file to the plug
+- Wait a few seconds again and then look at the NodeJS log to verify the command worked as it should. You should see something such as `::ffff:192.168.0.131 - /payload.bin` which indicates the NodeJS server was able to send the ESPresense factory image to the plug
 - DONE! The firmware flashing should be complete
 
-## Part 4: Tasmota Setup
+## Part 4: ESPresense Setup
 
-- **TL;DR: Connect to the Tasmota WiFI. Configure the actual WiFi. Update the firmware. Apply the SwitchBot Tasmota Template. Configure the device**
-- NOTE: The NodeJS server is configured to flash Tasmota `tasmota32c3.factory.bin` which is described to be a "Factory binary to be used for initial flashing using esptool." The distinguishing factor is that a factory binary includes an entire partition table, bootloader, etc. rather than just application partition that is later sent for OTA binaries in the future
-- NOTE: The flashed Tasmota version is `v11.1.0 Ostara` and not a later version. This is because `v12.0.0 Paul` changed the partition layout to have a Safeboot partition, making the ESPHome firmware harder to flash onto the plug. This change is described in more detail [here](https://tasmota.github.io/docs/Safeboot/)
-- Connect to the Tasmota WiFi. It should be an unsecured WiFi network with SSID `tasmota-0c3d4f-1234` showing a portion of the WiFi MAC address and a random number. Once connected, configure it to connect to the real WiFi network. It will likely reuse the IP address it had earlier during the flashing process, which in this example was 192.168.0.131
-- Reconnect your phone to the real WiFi network and navigate to the Tasmota webpage, in this case http://192.168.0.131. Click "Firmware Upgrade," confirm the OTA URL is http://ota.tasmota.com/tasmota32/release/tasmota32c3.bin or something similar, and click "Start Upgrade." Wait a few minutes as the plug updates its firmware and reconnects to WiFi
-  - NOTE: The firmware upgrade may only succeed once, due to the first Tasmota firmware being a factory version that is easily overwritten. Subsequent firmware upgrades may fail silently, meaning the device reboots but the firmware doesn't actually upgrade. Check the console for signs of an error such as `{"StatusSTK":{"Exception":7,"Reason":"Store access fault","EPC":"403832ae","EXCVADDR":"00000000","CallChain":["40387caa","4038be68","420adf92","4038d178","403801ee","421161a0","42115638","42096b3e","42096bd6","42013be6"]}}` to validate if this is happening. This is due to the mismatch in partition layout
-  - The partition layout can be fixed by using the Tasmota Application "Partition Wizard" which can be downloaded from [here](https://tasmota.github.io/docs/Tasmota-Application/#partition-management). Partition Manager is also available but is not needed for this process. Download the `Partition Wizard.tapp` file to your computer
-  - Go to the SwitchBot Tasmota interface, into "Consoles" and then "Manage File System." Select the `Partition Wizard.tapp` file and click "Upload." If the page refreshes without showing the newly added file, reboot the Tasmota and try again and it should upload
-  - Reboot the Tasmota once the file is uploaded to get Tasmota to recognize the app. Then go to "Consoles" and then "Partition Wizard" to see the following page. It shows that the current partition layout is `app0` and `app1` and `fs` which is incompatible with larger firmwares, hence the need for an upgrade. There is thankfully a section to fix this with one button, "Start migration." Click it, confirm the multiple reboots warning, and wait a few minutes. Note that it will also update the firmware as part of this process
-  - ![pre-partition-wizard](./images/pre-partition-wizard.png)
-  - After a few minutes, click the Main Menu button to return to the Tasmota main menu. Confirm that the new partition layout has taken effect by going back to the "Partition Wizard" page, or just go to "Information." Both are pictured
-  - ![post-partition-wizard](./images/post-partition-wizard.png)
-  - ![post-partition-info](./images/post-partition-info.png)
-  - The SwitchBot is now prepared to accept future Tasmota firmware updates (though is also now incompatible with the ESPHome partition layout)
-
-- Once the Tasmota page is accessible again, go to "Configuration" and then "Configure Other." In the Template section, paste the following value and check the "Activate" button. Also feel free to change the Device Name, which shows up on the Tasmota home page. Finally, click "Save" and wait for the Tasmota to restart
-  - `{"NAME":"SwitchBot Smart Plug Mini W1901400","GPIO":[0,0,32,0,0,0,224,320,321,0,0,0,0,0,0,0,0,0,2720,2656,2624,0],"FLAG":0,"BASE":1}`
-  - The template can also be found on the Tasmota device repository https://templates.blakadder.com/switchbot_plugmini_W1901400.html
-  - The `GPIO` numbers refer to the different GPIO device IDs, found at https://tasmota.github.io/docs/Components/.  The `BASE` refers to a base template, which in this case is 1 or `ESP32C3`
-
-![template](./images/tasmota-configure-screen-1.png)
-
-- Perform the Power Calibration following the instructions in https://tasmota.github.io/docs/Power-Monitoring-Calibration/
-  - NOTE: Power Calibration is technically optional but not doing it can cause the power readings to be off by an order of magnitude. It is highly recommended to perform Power Calibration
-  - I used a Kill-a-watt and a portable space heater or hair dryer after confirming it was in a mode that had a Power Factor of 0.99 or 1.0
-  - I then used the Kill-a-watt to note the voltage, wattage, and amperage (in my case, 122.3V, 778W, 6.36A)
-  - I then used the [Backlog](https://tasmota.github.io/docs/Commands/#the-power-of-backlog) command in the Tasmota Console to write all three values at once: `Backlog0 VoltageSet 122.3; PowerSet 778; CurrentSet 6360` 
-  
-- A helpful pointer is to configure the time zone, and set up Daylight Savings https://tasmota.github.io/docs/Timezone-Table/
-- DONE! The SwitchBot Smart Plug Mini is now fully configured and ready to enter service
-
-![tasmota](./images/tasmota-main-page.png)
-
-
-
-
-
+- **TL;DR: Join the plug's `espresense-…` WiFi, enter your WiFi and MQTT details, then set the plug's pins**
+- The stage binary wipes the start of flash, so the plug boots ESPresense with no settings. It opens an open WiFi network named `espresense-` followed by its MAC address. Join it from a phone or laptop; the captive portal opens (or browse to http://192.168.4.1)
+- Enter your WiFi network, MQTT broker and room name, then save. The plug reboots, joins your network and appears in ESPresense-companion / Home Assistant like any other node
+- Open the node's web page, go to **Hardware**, and set the relay, button and LED pins for the plug. The Plug Mini's GPIO map is in the [Blakadder template](https://templates.blakadder.com/switchbot_plugmini_W1901400.html)
+- From here on, update the plug like any other ESPresense node. Use the plain `esp32c3` firmware; the plug has no USB, so `-cdc` builds buy nothing
 
 ____
 
@@ -142,14 +116,21 @@ The included ESP-IDF code is a lightweight OTA client that directly writes to th
 4. The factory firmware installs the binary to ota_0 or ota_1, depending on past usage
 5. The binary runs from its OTA partition. If it's on ota_1, it skips to step 6. Otherwise, it performs another OTA, downloading itself into ota_1 and rebooting.
 6. Once on OTA_1, the device fetches `http://www.wohand.com/payload.bin` for OTA
-7. The request is intercepted and served by the NodeJS web server, delivering our desired payload (Tasmota firmware)
-8. The Espressif binary wipes the internal flash and flashes the payload. It performs two checksums, one of the downloaded binary and another of the flashed binary. It will continue to retry without restarting until the checksums are valid
+7. The request is intercepted and served by the NodeJS web server, delivering the payload pinned in `payload.json` (an ESPresense factory image)
+8. The Espressif binary wipes the internal flash up to `WRITE_SIZE` (the payload size rounded up to 4 KB) and flashes the payload. It performs two checksums, one of the downloaded binary and another of the flashed binary. It will continue to retry without restarting until the checksums are valid
 
 ## Troubleshooting
 The WiFi configuration is read from the device's NVS memory by the Espressif binary. This should be configured in the SwitchBot app prior to the process. If for whatever reason it is lost, the binary will make a fallback connection to SSID `switchbota`, password `switchbota`. You may need to create this SSID to recover the device.
 
-## Donations
-To support my work, consider making a purchase from SwitchBot using my [affiliate link](https://us.switch-bot.com/?sca_ref=2185819.iOqi8Gnz5f). Alternatively, please see my sponsor page [here](https://github.com/sponsors/kendallgoto).
+## Updating the payload
+1. Pick an ESPresense build that publishes `esp32c3.factory.bin` (release asset or CI artifact).
+2. Put its URL and MD5 in `payload.json` (`md5sum esp32c3.factory.bin`).
+3. Push: CI rebuilds the stage binary with the new MD5 and size. Tag a release (`v*`) so the server can fetch `app.bin` and `app.bin.md5`.
+
+The server and the stage binary both read `payload.json`, so they always agree on which image is being installed.
+
+## Credits
+SwitchPresense is a fork of [SwitchbOTA](https://github.com/kendallgoto/switchbota) by Kendall Goto (GPL-3.0); all of the BLE trigger, DNS and stage-binary work is theirs. To support the original author, see their [sponsor page](https://github.com/sponsors/kendallgoto).
 
 ## Links and Resources
 

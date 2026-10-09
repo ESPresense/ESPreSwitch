@@ -1,5 +1,6 @@
 // This file is part of switchbota (https://github.com/kendallgoto/switchbota/).
 // Copyright (c) 2022 Kendall Goto.
+// Modified for ESPresense (SwitchPresense), 2026.
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -81,12 +82,14 @@ if (args.length) {
 }
 // You can temporarily set your router's DNS to the host this host's IP
 // and it will correctly take care of wohand.com resolution.
-const PAYLOAD_URL = 'https://github.com/arendst/Tasmota/releases/download/v11.1.0/tasmota32c3.factory.bin';
+// payload.json is shared with the stage build, which bakes the same MD5 into app.bin.
+const PAYLOAD = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'payload.json'), 'utf8'));
+const PAYLOAD_URL = PAYLOAD.url;
 const PAYLOAD_PATH = path.join(__dirname, 'bin', 'payload.bin');
-const PAYLOAD_BIN_MD5 = '14e7cc0d16e72da007727581520047d5';
-const APP_URL = 'https://github.com/kendallgoto/switchbota/releases/latest/download/app.bin';
+const PAYLOAD_BIN_MD5 = PAYLOAD.md5;
+// The stage app is rebuilt whenever payload.json changes, so its MD5 is published next to it.
+const APP_URL = 'https://github.com/ESPresense/SwitchPresense/releases/latest/download/app.bin';
 const APP_PATH = path.join(__dirname, 'bin', 'app.bin');
-const APP_BIN_MD5 = 'cc9ec0df568b6e19da2096471ed8f531';
 (async function () {
 
 	function getFileHash(path) {
@@ -127,6 +130,21 @@ const APP_BIN_MD5 = 'cc9ec0df568b6e19da2096471ed8f531';
 			});
 		}
 	}
+
+	function fetchText(url) {
+		return new Promise((resolve, reject) => {
+			https.get(url, (res) => {
+				if (res.statusCode !== 200) return reject(new Error(`GET ${url} returned ${res.statusCode}`));
+				let body = '';
+				res.on('data', (chunk) => body += chunk);
+				res.on('end', () => resolve(body.trim().split(/\s+/)[0]));
+			}).on('error', reject);
+		});
+	}
+
+	fs.mkdirSync(path.join(__dirname, 'bin'), { recursive: true });
+	const APP_BIN_MD5 = await fetchText(APP_URL + '.md5');
+	console.log(`Payload ${PAYLOAD_URL} (md5 ${PAYLOAD_BIN_MD5}), stage app md5 ${APP_BIN_MD5}`);
 
 	invalidateFileOnBadMd5(PAYLOAD_PATH, PAYLOAD_BIN_MD5);
 	invalidateFileOnBadMd5(APP_PATH, APP_BIN_MD5);
