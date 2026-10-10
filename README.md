@@ -4,7 +4,7 @@
 
 SwitchPresense converts a stock SwitchBot Smart Plug Mini straight to [ESPresense](https://espresense.com) over the air, without disassembling the device. It is a fork of [SwitchbOTA](https://github.com/kendallgoto/switchbota) by Kendall Goto, which does the same for Tasmota.
 
-**Why not go through Tasmota?** SwitchbOTA's route (stock → Tasmota v11.1.0 → ESPresense) leaves the plug on Tasmota's bootloader and partition table forever, and current ESPresense builds (pure ESP-IDF v5.4) have not been proven to boot on that bootloader. SwitchPresense writes an ESPresense *factory image* instead: ESPresense's own bootloader, partition table and app, so the plug ends up laid out like any other ESPresense ESP32-C3 node.
+**Why not go through Tasmota?** SwitchbOTA's route (stock → Tasmota v11.1.0 → ESPresense) leaves the plug on Tasmota's bootloader and partition table forever. Current ESPresense builds (pure ESP-IDF v5.4) do boot on it, but they were never built or tested for that layout, and one plug hung after an OTA reboot until it was power-cycled. SwitchPresense writes an ESPresense *factory image* instead: ESPresense's own bootloader, partition table and app, so the plug ends up laid out like any other ESPresense ESP32-C3 node.
 
 The image it installs is pinned in [`payload.json`](./payload.json) (URL + MD5). The stage binary bakes in that MD5 and size at build time and refuses to build if the image would reach its own partition at `0x220000`.
 
