@@ -10,8 +10,8 @@
   "license": "ISC",
   "dependencies": {
     "async": "^3.2.3",
-    "express": "^4.17.3",
-    "follow-redirects": "^1.14.9",
+    "express": "^4.22.3",
+    "follow-redirects": "^1.16.1",
     "native-dns": "^0.7.0"
   }
 }
