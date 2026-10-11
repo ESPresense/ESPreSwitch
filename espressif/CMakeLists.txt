@@ -32,4 +32,4 @@ file(WRITE "${CMAKE_CURRENT_LIST_DIR}/main/include/payload_config.h"
 message(STATUS "Payload ${PAYLOAD_URL}: ${PAYLOAD_SIZE} bytes, WRITE_SIZE=${WRITE_SIZE}")
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
-project(switchpresense)
+project(espreswitch)

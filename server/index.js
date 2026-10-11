@@ -1,6 +1,6 @@
 // This file is part of switchbota (https://github.com/kendallgoto/switchbota/).
 // Copyright (c) 2022 Kendall Goto.
-// Modified for ESPresense (SwitchPresense), 2026.
+// Modified for ESPresense (ESPreSwitch), 2026.
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -88,7 +88,7 @@ const PAYLOAD_URL = PAYLOAD.url;
 const PAYLOAD_PATH = path.join(__dirname, 'bin', 'payload.bin');
 const PAYLOAD_BIN_MD5 = PAYLOAD.md5;
 // The stage app is rebuilt whenever payload.json changes, so its MD5 is published next to it.
-const APP_URL = 'https://github.com/ESPresense/SwitchPresense/releases/latest/download/app.bin';
+const APP_URL = 'https://github.com/ESPresense/ESPreSwitch/releases/latest/download/app.bin';
 const APP_PATH = path.join(__dirname, 'bin', 'app.bin');
 (async function () {
 

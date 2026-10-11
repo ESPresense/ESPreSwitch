@@ -1,10 +1,10 @@
 
-# SwitchPresense
+# ESPreSwitch
 ![switchbot-product-photo](./images/switchbot-product-photo.jpg)
 
-SwitchPresense converts a stock SwitchBot Smart Plug Mini straight to [ESPresense](https://espresense.com) over the air, without disassembling the device. It is a fork of [SwitchbOTA](https://github.com/kendallgoto/switchbota) by Kendall Goto, which does the same for Tasmota.
+ESPreSwitch converts a stock SwitchBot Smart Plug Mini straight to [ESPresense](https://espresense.com) over the air, without disassembling the device. It is a fork of [SwitchbOTA](https://github.com/kendallgoto/switchbota) by Kendall Goto, which does the same for Tasmota.
 
-**Why not go through Tasmota?** SwitchbOTA's route (stock → Tasmota v11.1.0 → ESPresense) leaves the plug on Tasmota's bootloader and partition table forever. Current ESPresense builds (pure ESP-IDF v5.4) do boot on it, but they were never built or tested for that layout, and one plug hung after an OTA reboot until it was power-cycled. SwitchPresense writes an ESPresense *factory image* instead: ESPresense's own bootloader, partition table and app, so the plug ends up laid out like any other ESPresense ESP32-C3 node.
+**Why not go through Tasmota?** SwitchbOTA's route (stock → Tasmota v11.1.0 → ESPresense) leaves the plug on Tasmota's bootloader and partition table forever. Current ESPresense builds (pure ESP-IDF v5.4) do boot on it, but they were never built or tested for that layout, and one plug hung after an OTA reboot until it was power-cycled. ESPreSwitch writes an ESPresense *factory image* instead: ESPresense's own bootloader, partition table and app, so the plug ends up laid out like any other ESPresense ESP32-C3 node.
 
 The image it installs is pinned in [`payload.json`](./payload.json) (URL + MD5). The stage binary bakes in that MD5 and size at build time and refuses to build if the image would reach its own partition at `0x220000`.
 
@@ -24,14 +24,14 @@ Some details about the devices are as follows:
 - They are ultrasonically welded shut, requiring destruction of the plastic housing to access the circuits within. There are no screws to allow access to the internals, the way there is with the Sonoff S31
 - They use the Shanghai Belling BL0937 energy measurement IC to track power usage
 - They use the Espressif ESP32-C3 chip for WiFi, Bluetooth Low Energy (BLE), and circuit control. See [here](https://tasmota.github.io/docs/ESP32/#esp32-differences) to learn about the different types of ESP32. The MAC addresses for WiFi and BLE follow the [ESP32 standard](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/api-reference/system/misc_system_api.html#mac-address) of having an offset of two. If the WIFI-MAC is `34:85:18:0F:CC:DC`, then the BLE-MAC is `34:85:18:0F:CC:DE` (DC in hex is 220, DE is 222)
-- The upstream SwitchbOTA flashing process is confirmed to work on both device models using firmware v1.4 or older (v1.3, v1.2). SwitchPresense uses the same stage binary and triggers, only the payload differs
+- The upstream SwitchbOTA flashing process is confirmed to work on both device models using firmware v1.4 or older (v1.3, v1.2). ESPreSwitch uses the same stage binary and triggers, only the payload differs
 
 ## Disclaimer
 Writing to the bootloader over OTA is dangerous and not normally done for good reason. If your device loses power or somehow flashes corrupted data, the device will be bricked and require disassembly to reprogram the device. Only perform this process if you are comfortable disassembling your plug to fix it if it breaks! Of course, do not unplug or otherwise disturb the plug while it is performing the OTA.
 
 **This is a proof of concept and provided with no warranty.** The ESPresense payload has not yet been tested on a stock plug. Try it first on a plug you are prepared to open.
 
-**Already converted a plug via Tasmota?** SwitchPresense needs the stock SwitchBot firmware; it cannot re-run on a plug that already runs Tasmota or ESPresense.
+**Already converted a plug via Tasmota?** ESPreSwitch needs the stock SwitchBot firmware; it cannot re-run on a plug that already runs Tasmota or ESPresense.
 
 ## Part 1: Plug Setup
 
@@ -130,7 +130,7 @@ The WiFi configuration is read from the device's NVS memory by the Espressif bin
 The server and the stage binary both read `payload.json`, so they always agree on which image is being installed.
 
 ## Credits
-SwitchPresense is a fork of [SwitchbOTA](https://github.com/kendallgoto/switchbota) by Kendall Goto (GPL-3.0); all of the BLE trigger, DNS and stage-binary work is theirs. To support the original author, see their [sponsor page](https://github.com/sponsors/kendallgoto).
+ESPreSwitch is a fork of [SwitchbOTA](https://github.com/kendallgoto/switchbota) by Kendall Goto (GPL-3.0); all of the BLE trigger, DNS and stage-binary work is theirs. To support the original author, see their [sponsor page](https://github.com/sponsors/kendallgoto).
 
 ## Links and Resources
 

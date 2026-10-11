@@ -1,4 +1,4 @@
-name: SwitchPresense app.bin build
+name: ESPreSwitch app.bin build
 
 on:
   push:
@@ -27,7 +27,7 @@ jobs:
 
     - name: Package app.bin
       run: |
-        cp espressif/build/switchpresense.bin app.bin
+        cp espressif/build/espreswitch.bin app.bin
         md5sum app.bin | cut -d' ' -f1 > app.bin.md5
         echo "app.bin $(stat -c%s app.bin) bytes, md5 $(cat app.bin.md5)"
 

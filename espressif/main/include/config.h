@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-// Modified for ESPresense (SwitchPresense), 2026.
+// Modified for ESPresense (ESPreSwitch), 2026.
 
 #pragma once
 

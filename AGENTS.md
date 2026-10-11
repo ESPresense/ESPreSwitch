@@ -1,6 +1,6 @@
-# SwitchPresense: notes for agents and maintainers
+# ESPreSwitch: notes for agents and maintainers
 
-SwitchPresense is ESPresense's fork of [SwitchbOTA](https://github.com/kendallgoto/switchbota) (GPL-3.0).
+ESPreSwitch is ESPresense's fork of [SwitchbOTA](https://github.com/kendallgoto/switchbota) (GPL-3.0).
 It converts a **stock** SwitchBot Plug Mini (ESP32-C3, no USB, case welded shut) straight to
 ESPresense over the air. It writes a full ESPresense factory image, so the plug gets ESPresense's
 own bootloader and partition table instead of Tasmota's.
@@ -76,9 +76,9 @@ back before flashing the next.
 
 ## Open tasks
 
-- [ ] Test SwitchPresense end-to-end on a stock plug (firmware v1.4 or older).
+- [ ] Test ESPreSwitch end-to-end on a stock plug (firmware v1.4 or older).
 - [ ] Re-pin `payload.json` to a release asset once an ESPresense release ships
-      `esp32c3.factory.bin` (`v5.0.0-b.0` is still a draft), then tag a new SwitchPresense release.
+      `esp32c3.factory.bin` (`v5.0.0-b.0` is still a draft), then tag a new ESPreSwitch release.
 - [ ] ESPresense: an `esp32c3-switchbot` flavor with the plug's relay/button/LED pin defaults
       (relay outputs: ESPresense/ESPresense#2530), so plugs identify themselves.
 - [ ] ESPresense-companion: make `start_firmware_update` refuse to change a node's flavor unless forced.
