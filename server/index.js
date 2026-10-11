@@ -146,6 +146,14 @@ const APP_PATH = path.join(__dirname, 'bin', 'app.bin');
 	const APP_BIN_MD5 = await fetchText(APP_URL + '.md5');
 	console.log(`Payload ${PAYLOAD_URL} (md5 ${PAYLOAD_BIN_MD5}), stage app md5 ${APP_BIN_MD5}`);
 
+	// app.bin only accepts the payload whose MD5 was baked in at build time. Serving any other one
+	// leaves a plug with its flash erased, retrying forever, so refuse to start on a mismatch.
+	const APP_PAYLOAD_MD5 = await fetchText(APP_URL.replace(/app\.bin$/, 'payload.md5'));
+	if (APP_PAYLOAD_MD5 !== PAYLOAD_BIN_MD5) {
+		console.error(`payload.json md5 ${PAYLOAD_BIN_MD5} does not match the md5 ${APP_PAYLOAD_MD5} the latest app.bin was built for; pull this checkout to the latest release`);
+		process.exit(1);
+	}
+
 	invalidateFileOnBadMd5(PAYLOAD_PATH, PAYLOAD_BIN_MD5);
 	invalidateFileOnBadMd5(APP_PATH, APP_BIN_MD5);
 
