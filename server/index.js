@@ -82,7 +82,7 @@ if (args.length) {
 }
 // You can temporarily set your router's DNS to the host this host's IP
 // and it will correctly take care of wohand.com resolution.
-// payload.json is shared with the stage build, which bakes the same MD5 into app.bin.
+// payload.json pins the payload. The stage fetches its MD5 and size from /payload.md5 before erasing.
 const PAYLOAD = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'payload.json'), 'utf8'));
 const PAYLOAD_URL = PAYLOAD.url;
 const PAYLOAD_PATH = path.join(__dirname, 'bin', 'payload.bin');
@@ -146,20 +146,21 @@ const APP_PATH = path.join(__dirname, 'bin', 'app.bin');
 	const APP_BIN_MD5 = await fetchText(APP_URL + '.md5');
 	console.log(`Payload ${PAYLOAD_URL} (md5 ${PAYLOAD_BIN_MD5}), stage app md5 ${APP_BIN_MD5}`);
 
-	// app.bin only accepts the payload whose MD5 was baked in at build time. Serving any other one
-	// leaves a plug with its flash erased, retrying forever, so refuse to start on a mismatch.
-	const APP_PAYLOAD_MD5 = await fetchText(APP_URL.replace(/app\.bin$/, 'payload.md5'));
-	if (APP_PAYLOAD_MD5 !== PAYLOAD_BIN_MD5) {
-		console.error(`payload.json md5 ${PAYLOAD_BIN_MD5} does not match the md5 ${APP_PAYLOAD_MD5} the latest app.bin was built for; pull this checkout to the latest release`);
-		process.exit(1);
-	}
-
 	invalidateFileOnBadMd5(PAYLOAD_PATH, PAYLOAD_BIN_MD5);
 	invalidateFileOnBadMd5(APP_PATH, APP_BIN_MD5);
 
 	download(PAYLOAD_PATH, PAYLOAD_URL, PAYLOAD_BIN_MD5);
 	download(APP_PATH, APP_URL, APP_BIN_MD5);
 
+	// "<md5> <size>" for the stage, only once payload.bin is downloaded and verified; until then the
+	// stage gets a 503 and retries without touching flash.
+	app.get('/payload.md5', (req, res) => {
+		console.log(`${req.ip} - ${req.url}`);
+		if (!fs.existsSync(PAYLOAD_PATH) || getFileHash(PAYLOAD_PATH) != PAYLOAD_BIN_MD5) {
+			return res.status(503).send('payload not ready');
+		}
+		res.type('text/plain').send(`${PAYLOAD_BIN_MD5} ${fs.statSync(PAYLOAD_PATH).size}`);
+	})
 	app.get('/payload.bin', (req, res) => {
 		console.log(`${req.ip} - ${req.url}`);
 		const file = path.join(__dirname, 'bin', 'payload.bin');

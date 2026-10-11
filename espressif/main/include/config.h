@@ -17,9 +17,8 @@
 
 #pragma once
 
-#include "payload_config.h"  // BINARY_MD5 and WRITE_SIZE, generated from payload.json
-
 #define BINARY_URL "http://www.wohand.com/payload.bin"
+#define PAYLOAD_INFO_URL "http://www.wohand.com/payload.md5"  // "<md5 hex> <size>"
 #define OTA_BUF 2048
 
 #define FALLBACK_URL "http://www.wohand.com/app.bin"

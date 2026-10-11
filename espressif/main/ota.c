@@ -27,6 +27,9 @@
 #include "freertos/event_groups.h"
 #include "rom/md5_hash.h"
 
+#include <stdbool.h>
+#include <stdlib.h>
+
 #include "config.h"
 
 #include "ota.h"
@@ -110,6 +113,58 @@ int verify_checksum(unsigned char *result, unsigned char *comparison)
 
 unsigned char buf[OTA_BUF];
 
+// The payload's MD5 and size come from the server (PAYLOAD_INFO_URL), so one app.bin works with any payload.
+static unsigned char payload_md5[16];
+static int payload_size;
+static int write_size;  // payload_size rounded up to whole 4 KB sectors
+
+static int hexval(char c)
+{
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    return -1;
+}
+
+// Fetch "<md5 hex> <size>" from the server. Returns false (and changes nothing in flash) on any error.
+static bool fetch_payload_info()
+{
+    esp_http_client_config_t config = {
+        .url = PAYLOAD_INFO_URL,
+        .event_handler = ota_event_handler,
+    };
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+    char body[64] = { 0 };
+    int len = -1;
+    if (esp_http_client_open(client, 0) == ESP_OK && esp_http_client_fetch_headers(client) >= 0 &&
+        esp_http_client_get_status_code(client) == 200) {
+        len = esp_http_client_read(client, body, sizeof(body) - 1);
+    }
+    esp_http_client_close(client);
+    esp_http_client_cleanup(client);
+    if (len < 34) {
+        ESP_LOGE(TAG, "payload info: bad response from " PAYLOAD_INFO_URL);
+        return false;
+    }
+    body[len] = '\0';
+    for (int i = 0; i < 16; i++) {
+        int hi = hexval(body[2 * i]), lo = hexval(body[2 * i + 1]);
+        if (hi < 0 || lo < 0) {
+            ESP_LOGE(TAG, "payload info: bad md5 '%s'", body);
+            return false;
+        }
+        payload_md5[i] = (hi << 4) | lo;
+    }
+    payload_size = atoi(body + 32);
+    if (payload_size <= 0) {
+        ESP_LOGE(TAG, "payload info: bad size '%s'", body);
+        return false;
+    }
+    write_size = (payload_size + 4095) & ~4095;
+    ESP_LOGI(TAG, "payload: %d bytes, erasing up to 0x%x", payload_size, write_size);
+    return true;
+}
+
 void ota_flip() {
     esp_http_client_config_t config = {
         .url = FALLBACK_URL,
@@ -145,9 +200,6 @@ void ota_flip() {
 }
 
 void ota_inject() {
-        ESP_LOGI(TAG, "erasing bootloader! don't lose power now!");
-        ESP_ERROR_CHECK( esp_flash_erase_region(NULL, 0, WRITE_SIZE) );
-
         esp_http_client_config_t config = {
             .url = BINARY_URL,
             .event_handler = ota_event_handler,
@@ -156,6 +208,17 @@ void ota_inject() {
         esp_http_client_open(client, 0);
         esp_http_client_fetch_headers(client);
         int totalBytes = esp_http_client_get_content_length(client);
+        if (totalBytes != payload_size) {
+            // nothing erased yet, so a mismatch here is harmless
+            ESP_LOGE(TAG, "payload is %d bytes, expected %d; retrying ...", totalBytes, payload_size);
+            esp_http_client_close(client);
+            esp_http_client_cleanup(client);
+            vTaskDelay(5000 / portTICK_PERIOD_MS);
+            return;
+        }
+
+        ESP_LOGI(TAG, "erasing bootloader! don't lose power now!");
+        ESP_ERROR_CHECK( esp_flash_erase_region(NULL, 0, write_size) );
         int readBytes = 0;
 
         struct MD5Context hashCalculate = { 0 };
@@ -172,7 +235,7 @@ void ota_inject() {
         MD5Final(hashData, &hashCalculate);
         esp_http_client_close(client);
         esp_http_client_cleanup(client);
-        if(verify_checksum(hashData, BINARY_MD5)) {
+        if(verify_checksum(hashData, payload_md5)) {
             ESP_LOGI(TAG, "Download MD5 OK, verifying SPI");
             // verify written data from SPI
             struct MD5Context spiMD5 = { 0 };
@@ -187,7 +250,7 @@ void ota_inject() {
                 vTaskDelay(20 / portTICK_PERIOD_MS);
             }
             MD5Final(spiHashData, &spiMD5);
-            if(verify_checksum(spiHashData, BINARY_MD5)) {
+            if(verify_checksum(spiHashData, payload_md5)) {
                 ESP_LOGI(TAG, "SPI Write OK - restarting ...");
                 esp_restart();
             } else {
@@ -203,9 +266,19 @@ void ota_task(void *pvParameters)
 {
     // check if we're in an ok OTA position ...
     ESP_LOGI(TAG, "ota_task ready");
+    while (!fetch_payload_info()) {
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
+    }
+    // The write covers 0x0..write_size, so the stage must run from above it or it erases itself.
     const esp_partition_t *currentPartition = esp_ota_get_running_partition();
-    if(currentPartition->address < WRITE_SIZE) {
-        ESP_LOGI(TAG, "OTA_0 detected!");
+    if(currentPartition->address < write_size) {
+        const esp_partition_t *next = esp_ota_get_next_update_partition(NULL);
+        if (next == NULL || next->address < write_size) {
+            ESP_LOGE(TAG, "no app partition starts above 0x%x; not flashing", write_size);
+            vTaskDelete(NULL);
+            return;
+        }
+        ESP_LOGI(TAG, "%s is below the payload's end, moving to %s", currentPartition->label, next->label);
         ota_flip();
         return;
     } else {

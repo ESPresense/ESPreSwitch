@@ -10,26 +10,27 @@ own bootloader and partition table instead of Tasmota's.
 1. The user points `wohand.com` at the machine running `server/` (DNS override, or `node index.js <ip>`
    for the built-in DNS proxy), then triggers a "firmware update" over BLE (README Part 3).
 2. The stock firmware downloads the **stage app** (`app.bin`, built from `espressif/`) into an OTA
-   slot. If the stage lands in `ota_0` (`0x20000`), it copies itself to `ota_1` (`0x220000`) and reboots.
-3. Running from `ota_1`, the stage **erases flash from `0x0` to `WRITE_SIZE`** and writes the
-   payload (`/payload.bin`) raw from offset 0. It MD5-checks both the download and a read-back
-   of flash, and retries until both match.
+   slot. The stage fetches `/payload.md5` (`"<md5> <size>"`) from the server. If it's running below
+   the payload's end (`ota_0` at `0x20000`), it copies itself to the next slot (`ota_1` at `0x220000`)
+   and reboots. If no slot starts above the payload's end, it stops without erasing anything.
+3. Running from above the payload's end, the stage checks `/payload.bin`'s length against that size,
+   then **erases flash from `0x0` to the size rounded up to 4 KB** and writes the payload raw from
+   offset 0. It MD5-checks both the download and a read-back of flash, and retries until both match.
 4. The plug reboots into ESPresense with no settings and opens an open AP `espresense-<mac>`
    (portal at 192.168.4.1).
 
 ## Single source of truth: `payload.json`
 
 `{ "url", "md5" }` of the factory image to install.
-- `espressif/CMakeLists.txt` downloads it at configure time, verifies the MD5, and generates
-  `espressif/main/include/payload_config.h` (gitignored) with `BINARY_MD5` and `WRITE_SIZE`
-  (payload size rounded up to 4 KB).
-- `server/index.js` reads the same file to download and serve `/payload.bin`. It fetches the stage
-  from this repo's latest release and checks it against `app.bin.md5`.
+- Only the server reads it. `server/index.js` downloads the payload, verifies the MD5, and serves
+  `/payload.bin` plus `/payload.md5` (`"<md5> <size>"`, 503 until the payload is downloaded and verified).
+  It fetches the stage from this repo's latest release and checks it against `app.bin.md5`.
+- The stage has nothing payload-specific compiled in, so changing the payload needs no new release.
 
-**Safety bound:** the build fails unless `0x20000 < WRITE_SIZE <= 0x220000`. The stage runs from
-`ota_1` at `0x220000`, and a bigger payload would overwrite it mid-write and brick the plug. The
-stage also uses `WRITE_SIZE` to tell which slot it's running from (`address < WRITE_SIZE` means
-`ota_0`). Never hand-edit those values in `config.h`.
+**Safety bound:** the stage erases `0x0` up to the payload size rounded up to 4 KB, so it must run
+from a partition that starts above that, or it erases itself mid-write and bricks the plug. It checks
+this on the plug against the real partition table: `0x220000` on stock plugs, `0x1E0000` on the
+Tasmota v11 layout. It erases nothing until it has the payload info and the download size matches.
 
 ## Build and release
 
@@ -41,9 +42,8 @@ stage also uses `WRITE_SIZE` to tell which slot it's running from (`address < WR
     (drops the custom partition table and sets 2 MB flash).
   - A local build may rewrite `espressif/sdkconfig` with IDF patch-level churn. Revert it before
     committing (`git checkout -- espressif/sdkconfig`).
-- Changing the payload: update `payload.json` (`md5sum`), push, let CI pass, tag a new release.
-  The stage's baked-in MD5 has to match the server's payload, so a payload change without a new
-  stage release breaks conversions.
+- Changing the payload: update `payload.json` (`md5sum`), push, then `git pull` and restart the server.
+  No stage rebuild or release is needed.
 
 ## Flash layouts (4 MB)
 
@@ -59,7 +59,7 @@ reads the partition table at runtime, so it tolerates either of the last two lay
 
 ## Status (2026-10-11)
 
-- `v0.2.0` released (stage `app.bin` + `.md5`). CI is green.
+- `v0.3.0` released (stage `app.bin` + `.md5`); the stage reads the payload MD5 and size from the server. CI is green.
 - `payload.json` pins `esp32c3.factory.bin` from the **ESPresense v5.0.0b1 pre-release** (release asset,
   so it doesn't expire). Writing it ends at `0x174000`, below both `0x220000` (stock) and `0x1E0000` (Tasmota v11 layout).
 - **Not yet tested on a stock plug.** Do the first run on a plug you're prepared to open.
@@ -78,7 +78,7 @@ back before flashing the next.
 
 - [ ] Test ESPreSwitch end-to-end on a stock plug (firmware v1.4 or older).
 - [ ] Re-pin `payload.json` to a stable ESPresense release once one ships `esp32c3.factory.bin`
-      (currently on the v5.0.0b1 pre-release), then tag a new ESPreSwitch release.
+      (currently on the v5.0.0b1 pre-release).
 - [ ] ESPresense: an `esp32c3-switchbot` flavor with the plug's relay/button/LED pin defaults
       (relay outputs: ESPresense/ESPresense#2530), so plugs identify themselves.
 - [ ] ESPresense-companion: make `start_firmware_update` refuse to change a node's flavor unless forced.

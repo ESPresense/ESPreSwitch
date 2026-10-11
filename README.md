@@ -6,7 +6,7 @@ ESPreSwitch converts a stock SwitchBot Smart Plug Mini straight to [ESPresense](
 
 **Why not go through Tasmota?** SwitchbOTA's route (stock → Tasmota v11.1.0 → ESPresense) leaves the plug on Tasmota's bootloader and partition table forever. Current ESPresense builds (pure ESP-IDF v5.4) do boot on it, but they were never built or tested for that layout, and one plug hung after an OTA reboot until it was power-cycled. ESPreSwitch writes an ESPresense *factory image* instead: ESPresense's own bootloader, partition table and app, so the plug ends up laid out like any other ESPresense ESP32-C3 node.
 
-The image it installs is pinned in [`payload.json`](./payload.json) (URL + MD5). The stage binary bakes in that MD5 and size at build time and refuses to build if the image would reach its own partition at `0x220000`.
+The image it installs is pinned in [`payload.json`](./payload.json) (URL + MD5). The stage binary asks the server for the image's MD5 and size, and refuses to erase anything if the image would reach the partition it is running from.
 
 ## SwitchBot Hardware Details
 
@@ -117,7 +117,7 @@ The included ESP-IDF code is a lightweight OTA client that directly writes to th
 5. The binary runs from its OTA partition. If it's on ota_1, it skips to step 6. Otherwise, it performs another OTA, downloading itself into ota_1 and rebooting.
 6. Once on OTA_1, the device fetches `http://www.wohand.com/payload.bin` for OTA
 7. The request is intercepted and served by the NodeJS web server, delivering the payload pinned in `payload.json` (an ESPresense factory image)
-8. The Espressif binary wipes the internal flash up to `WRITE_SIZE` (the payload size rounded up to 4 KB) and flashes the payload. It performs two checksums, one of the downloaded binary and another of the flashed binary. It will continue to retry without restarting until the checksums are valid
+8. The Espressif binary fetches the payload's MD5 and size from `/payload.md5`, wipes the internal flash up to that size (rounded up to 4 KB) and flashes the payload. It performs two checksums, one of the downloaded binary and another of the flashed binary. It will continue to retry without restarting until the checksums are valid
 
 ## Troubleshooting
 The WiFi configuration is read from the device's NVS memory by the Espressif binary. This should be configured in the SwitchBot app prior to the process. If for whatever reason it is lost, the binary will make a fallback connection to SSID `switchbota`, password `switchbota`. You may need to create this SSID to recover the device.
