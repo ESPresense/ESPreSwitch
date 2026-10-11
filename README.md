@@ -15,7 +15,7 @@ The image it installs is pinned in [`payload.json`](./payload.json) (URL + MD5).
 There are two SKUs of the SwitchBot Smart Plug Mini released in the US: 
 
 - The original "Smart Plug Mini" with model number W1901400, released in early 2022. Amazon sells these in [one-packs](https://amzn.to/3VEOGyR), [two-packs](https://amzn.to/4jIEXBy) and [four-packs](https://amzn.to/47dJ4hx)
-- The updated "HomeKit Smart Plug Mini" with model number W1901401, released later in 2022. As of 2023-12, Amazon sells these in [four-packs](https://www.amazon.com/dp/B0B9RHTM6Y) for about $38 or [one-packs](https://www.amazon.com/dp/B0B39DJFR8) for $15
+- The updated "HomeKit Smart Plug Mini" with model number W1901401, released later in 2022. As of 2026-19, they are unavailable.
 
 Some details about the devices are as follows:
 
