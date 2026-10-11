@@ -57,11 +57,11 @@ stage also uses `WRITE_SIZE` to tell which slot it's running from (`address < WR
 ESPresense's IDF firmware mounts SPIFFS by label (`spiffs`) with `format_if_mount_failed`, and
 reads the partition table at runtime, so it tolerates either of the last two layouts.
 
-## Status (2026-10-10)
+## Status (2026-10-11)
 
-- `v0.1.0` released (stage `app.bin` + `.md5`). CI is green.
-- `payload.json` pins the **esp32c3 factory image from ESPresense CI run 37950310137**
-  (ESPresense/ESPresense#2532, merged 2026-10-09). CI artifacts expire after ~90 days (around 2027-01-07).
+- `v0.2.0` released (stage `app.bin` + `.md5`). CI is green.
+- `payload.json` pins `esp32c3.factory.bin` from the **ESPresense v5.0.0b1 pre-release** (release asset,
+  so it doesn't expire). Writing it ends at `0x174000`, below both `0x220000` (stock) and `0x1E0000` (Tasmota v11 layout).
 - **Not yet tested on a stock plug.** Do the first run on a plug you're prepared to open.
 
 ### Background: plugs converted via Tasmota
@@ -77,8 +77,8 @@ back before flashing the next.
 ## Open tasks
 
 - [ ] Test ESPreSwitch end-to-end on a stock plug (firmware v1.4 or older).
-- [ ] Re-pin `payload.json` to a release asset once an ESPresense release ships
-      `esp32c3.factory.bin` (`v5.0.0-b.0` is still a draft), then tag a new ESPreSwitch release.
+- [ ] Re-pin `payload.json` to a stable ESPresense release once one ships `esp32c3.factory.bin`
+      (currently on the v5.0.0b1 pre-release), then tag a new ESPreSwitch release.
 - [ ] ESPresense: an `esp32c3-switchbot` flavor with the plug's relay/button/LED pin defaults
       (relay outputs: ESPresense/ESPresense#2530), so plugs identify themselves.
 - [ ] ESPresense-companion: make `start_firmware_update` refuse to change a node's flavor unless forced.
