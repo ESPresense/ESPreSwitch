@@ -28,6 +28,7 @@
 
 #include "wifi.h"
 #include "ota.h"
+#include "led.h"
 
 static const char *TAG = "switchbota";
 
@@ -47,6 +48,7 @@ void start_nvs(void)
 
 void app_main(void)
 {
+    led_init();
     start_nvs();
 
     ESP_LOGI(TAG, "Starting wifi task ...");

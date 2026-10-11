@@ -120,14 +120,52 @@ The included ESP-IDF code is a lightweight OTA client that directly writes to th
 8. The Espressif binary fetches the payload's MD5 and size from `/payload.md5`, wipes the internal flash up to that size (rounded up to 4 KB) and flashes the payload. It performs two checksums, one of the downloaded binary and another of the flashed binary. It will continue to retry without restarting until the checksums are valid
 
 ## Troubleshooting
-The WiFi configuration is read from the device's NVS memory by the Espressif binary. This should be configured in the SwitchBot app prior to the process. If for whatever reason it is lost, the binary will make a fallback connection to SSID `switchbota`, password `switchbota`. You may need to create this SSID to recover the device.
+
+### What the LEDs mean
+If a conversion goes wrong, the LEDs may be all you have to go on. While the ESPreSwitch stage is running, both LEDs blink together to show what it's doing.
+
+**Nothing erased yet: safe to unplug**
+
+| Pattern | Meaning | What to do |
+|---|---|---|
+| Slow blink, once a second | Looking for WiFi | Wait. After a minute it switches to the rescue network |
+| 2 blinks, pause | Can't reach WiFi; rescue network `espreswitch-xxxxxx` is up | Join it and enter a WiFi network (see below) |
+| Short blip every 2 seconds | On WiFi, but the ESPreSwitch server isn't answering properly | Check the server is running, the payload has finished downloading, and `wohand.com` resolves to it |
+| 3 blinks, long pause | Refused: the payload is too big for this plug's flash layout | Nothing was erased. Pick a smaller payload or unplug |
+| Solid | Talking to the server; about to erase or copying itself to the other slot | Wait |
+
+**Flash erased: do NOT unplug**
+
+| Pattern | Meaning | What to do |
+|---|---|---|
+| Fast blink, 5 times a second | Writing ESPresense | Wait; it reboots into ESPresense when done |
+| 5 fast blinks, pause | A write attempt failed (WiFi dropped, server unreachable, or checksum mismatch); retrying | Keep it powered. Check the server. If WiFi is the problem, the rescue network still appears after a minute |
+
+Once the erase starts, the LEDs only ever show these two patterns, even if WiFi drops, so "don't unplug" is always visible. Losing power while they show is the one thing that means opening the plug.
+
+**Other states**
+
+- **Stock SwitchBot behaviour:** the stage isn't running yet.
+- **Dark, with an open `espresense-…` WiFi network:** the conversion worked. ESPresense is running with no LED pins configured.
+- **Dark, with no network at all:** the plug isn't booting. If it went dark while the erased patterns were showing, it lost power mid-write and needs opening.
+
+The stage never drives the relay. If the button still switches the relay, the plug is running some other firmware (stock, Tasmota or ESPresense), not the stage.
+
+### The plug can't reach WiFi
+The stage joins the WiFi network saved in the plug. If that's missing, it tries SSID `switchbota`, password `switchbota`. If it still has no WiFi after a minute, it opens its own open network named `espreswitch-xxxxxx` (the end of its MAC address):
+
+1. Join `espreswitch-xxxxxx` from a phone or laptop and browse to http://192.168.4.1.
+2. Enter a WiFi network the plug can use. That network has to resolve `wohand.com` to the ESPreSwitch server: your normal LAN with the DNS override, or any network whose DHCP hands out the server's IP as DNS.
+3. The `espreswitch-xxxxxx` network disappears once the plug connects, and the flash carries on.
+
+This works even after the flash is erased, as long as the plug stays powered. The new network is kept in RAM only, so a power cut loses it, but a power cut after the erase means opening the plug anyway.
 
 ## Updating the payload
 1. Pick an ESPresense build that publishes `esp32c3.factory.bin` (release asset or CI artifact).
-2. Put its URL and MD5 in `payload.json` (`md5sum esp32c3.factory.bin`).
-3. Push: CI rebuilds the stage binary with the new MD5 and size. Tag a release (`v*`) so the server can fetch `app.bin` and `app.bin.md5`.
+2. Put its URL and MD5 in `payload.json` (`md5sum esp32c3.factory.bin`) and push.
+3. On the server: `git pull` and restart it.
 
-The server and the stage binary both read `payload.json`, so they always agree on which image is being installed.
+The stage binary has nothing payload-specific compiled in: it asks the server for the payload's MD5 and size before erasing anything, so no new ESPreSwitch release is needed.
 
 ## Credits
 ESPreSwitch is a fork of [SwitchbOTA](https://github.com/kendallgoto/switchbota) by Kendall Goto (GPL-3.0); all of the BLE trigger, DNS and stage-binary work is theirs. To support the original author, see their [sponsor page](https://github.com/sponsors/kendallgoto).

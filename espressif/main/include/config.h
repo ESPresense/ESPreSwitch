@@ -21,6 +21,10 @@
 #define PAYLOAD_INFO_URL "http://www.wohand.com/payload.md5"  // "<md5 hex> <size>"
 #define OTA_BUF 2048
 
+// The plug's LEDs (Blakadder W1901400 template: Led_i 1 and 2, active low). GPIO6 is the relay: leave it alone.
+#define LED1_GPIO 7
+#define LED2_GPIO 8
+
 #define FALLBACK_URL "http://www.wohand.com/app.bin"
 #define FALLBACK_SSID "switchbota"
 #define FALLBACK_PASS "switchbota"

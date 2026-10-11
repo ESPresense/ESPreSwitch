@@ -33,6 +33,7 @@
 #include "config.h"
 
 #include "ota.h"
+#include "led.h"
 
 static const char *TAG = "ota";
 
@@ -117,6 +118,8 @@ unsigned char buf[OTA_BUF];
 static unsigned char payload_md5[16];
 static int payload_size;
 static int write_size;  // payload_size rounded up to whole 4 KB sectors
+// Cached at start: the partition table at 0x8000 is erased along with the rest of 0x0..write_size.
+static uint32_t running_address;
 
 static int hexval(char c)
 {
@@ -144,6 +147,7 @@ static bool fetch_payload_info()
     esp_http_client_cleanup(client);
     if (len < 34) {
         ESP_LOGE(TAG, "payload info: bad response from " PAYLOAD_INFO_URL);
+        led_set(LED_NO_SERVER);
         return false;
     }
     body[len] = '\0';
@@ -151,6 +155,7 @@ static bool fetch_payload_info()
         int hi = hexval(body[2 * i]), lo = hexval(body[2 * i + 1]);
         if (hi < 0 || lo < 0) {
             ESP_LOGE(TAG, "payload info: bad md5 '%s'", body);
+            led_set(LED_NO_SERVER);
             return false;
         }
         payload_md5[i] = (hi << 4) | lo;
@@ -158,10 +163,12 @@ static bool fetch_payload_info()
     payload_size = atoi(body + 32);
     if (payload_size <= 0) {
         ESP_LOGE(TAG, "payload info: bad size '%s'", body);
+        led_set(LED_NO_SERVER);
         return false;
     }
     write_size = (payload_size + 4095) & ~4095;
     ESP_LOGI(TAG, "payload: %d bytes, erasing up to 0x%x", payload_size, write_size);
+    led_set(LED_READY);
     return true;
 }
 
@@ -200,6 +207,21 @@ void ota_flip() {
 }
 
 void ota_inject() {
+        // Re-read the payload info on every attempt, so a server restarted with a different payload
+        // can't leave an erased plug retrying forever against the old MD5.
+        if (!fetch_payload_info()) {
+            led_set(LED_WRITE_RETRY);  // no-op unless already erased
+            vTaskDelay(5000 / portTICK_PERIOD_MS);
+            return;
+        }
+        if (write_size > running_address) {
+            led_set(LED_REFUSED);
+            led_set(LED_WRITE_RETRY);
+            ESP_LOGE(TAG, "payload now ends at 0x%x, past this partition at 0x%x; retrying ...", write_size, running_address);
+            vTaskDelay(5000 / portTICK_PERIOD_MS);
+            return;
+        }
+
         esp_http_client_config_t config = {
             .url = BINARY_URL,
             .event_handler = ota_event_handler,
@@ -211,6 +233,8 @@ void ota_inject() {
         if (totalBytes != payload_size) {
             // nothing erased yet, so a mismatch here is harmless
             ESP_LOGE(TAG, "payload is %d bytes, expected %d; retrying ...", totalBytes, payload_size);
+            led_set(LED_NO_SERVER);
+            led_set(LED_WRITE_RETRY);
             esp_http_client_close(client);
             esp_http_client_cleanup(client);
             vTaskDelay(5000 / portTICK_PERIOD_MS);
@@ -218,6 +242,7 @@ void ota_inject() {
         }
 
         ESP_LOGI(TAG, "erasing bootloader! don't lose power now!");
+        led_set(LED_WRITING);
         ESP_ERROR_CHECK( esp_flash_erase_region(NULL, 0, write_size) );
         int readBytes = 0;
 
@@ -255,10 +280,12 @@ void ota_inject() {
                 esp_restart();
             } else {
                 ESP_LOGE(TAG, "SPI Write BAD, retrying ...");
+                led_set(LED_WRITE_RETRY);
             }
             vTaskDelay(5000 / portTICK_PERIOD_MS);
         } else {
             ESP_LOGE(TAG, "Download BAD, retrying ...");
+            led_set(LED_WRITE_RETRY);
             vTaskDelay(5000 / portTICK_PERIOD_MS);
         }
 }
@@ -271,10 +298,12 @@ void ota_task(void *pvParameters)
     }
     // The write covers 0x0..write_size, so the stage must run from above it or it erases itself.
     const esp_partition_t *currentPartition = esp_ota_get_running_partition();
+    running_address = currentPartition->address;
     if(currentPartition->address < write_size) {
         const esp_partition_t *next = esp_ota_get_next_update_partition(NULL);
         if (next == NULL || next->address < write_size) {
             ESP_LOGE(TAG, "no app partition starts above 0x%x; not flashing", write_size);
+            led_set(LED_REFUSED);
             vTaskDelete(NULL);
             return;
         }

@@ -16,6 +16,11 @@ own bootloader and partition table instead of Tasmota's.
 3. Running from above the payload's end, the stage checks `/payload.bin`'s length against that size,
    then **erases flash from `0x0` to the size rounded up to 4 KB** and writes the payload raw from
    offset 0. It MD5-checks both the download and a read-back of flash, and retries until both match.
+   If WiFi is down for a minute, the stage also opens an AP `espreswitch-xxxxxx` with a page at
+   192.168.4.1 to enter a new network (kept in RAM only: NVS at `0x9000` is inside the erased region).
+   The LEDs (GPIO7/8, active low) show the state, one pattern per stuck state (`espressif/main/led.c`).
+   Once erased, only the two erased patterns show. The README "What the LEDs mean" table must
+   match `led.c`; update both together.
 4. The plug reboots into ESPresense with no settings and opens an open AP `espresense-<mac>`
    (portal at 192.168.4.1).
 
@@ -59,7 +64,7 @@ reads the partition table at runtime, so it tolerates either of the last two lay
 
 ## Status (2026-10-11)
 
-- `v0.3.0` released (stage `app.bin` + `.md5`); the stage reads the payload MD5 and size from the server. CI is green.
+- `v0.4.0` released (stage `app.bin` + `.md5`): payload info from the server, re-checked on every retry; WiFi rescue portal; LED status. CI is green.
 - `payload.json` pins `esp32c3.factory.bin` from the **ESPresense v5.0.0b1 pre-release** (release asset,
   so it doesn't expire). Writing it ends at `0x174000`, below both `0x220000` (stock) and `0x1E0000` (Tasmota v11 layout).
 - **Not yet tested on a stock plug.** Do the first run on a plug you're prepared to open.

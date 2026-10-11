@@ -152,20 +152,20 @@ const APP_PATH = path.join(__dirname, 'bin', 'app.bin');
 	download(PAYLOAD_PATH, PAYLOAD_URL, PAYLOAD_BIN_MD5);
 	download(APP_PATH, APP_URL, APP_BIN_MD5);
 
-	// "<md5> <size>" for the stage, only once payload.bin is downloaded and verified; until then the
-	// stage gets a 503 and retries without touching flash.
+	// Both payload routes answer 503 until payload.bin is downloaded and verified, so the stage
+	// never sees a partial file; it retries without touching flash.
+	const payloadReady = () => fs.existsSync(PAYLOAD_PATH) && getFileHash(PAYLOAD_PATH) == PAYLOAD_BIN_MD5;
+	// "<md5> <size>" for the stage
 	app.get('/payload.md5', (req, res) => {
 		console.log(`${req.ip} - ${req.url}`);
-		if (!fs.existsSync(PAYLOAD_PATH) || getFileHash(PAYLOAD_PATH) != PAYLOAD_BIN_MD5) {
-			return res.status(503).send('payload not ready');
-		}
+		if (!payloadReady()) return res.status(503).send('payload not ready');
 		res.type('text/plain').send(`${PAYLOAD_BIN_MD5} ${fs.statSync(PAYLOAD_PATH).size}`);
 	})
 	app.get('/payload.bin', (req, res) => {
 		console.log(`${req.ip} - ${req.url}`);
-		const file = path.join(__dirname, 'bin', 'payload.bin');
+		if (!payloadReady()) return res.status(503).send('payload not ready');
 		res.setHeader('Content-Type', 'application/octet-stream');
-		res.sendFile(file);
+		res.sendFile(PAYLOAD_PATH);
 	})
 	app.get('*', (req, res) => {
 		console.log(`${req.ip} - ${req.url}`);
