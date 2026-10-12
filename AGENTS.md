@@ -16,6 +16,7 @@ own bootloader and partition table instead of Tasmota's.
 3. Running from above the payload's end, the stage checks `/payload.bin`'s length against that size,
    then **erases flash from `0x0` to the size rounded up to 4 KB** and writes the payload raw from
    offset 0. It MD5-checks both the download and a read-back of flash, and retries until both match.
+   With no saved WiFi it joins `espreswitch`/`espreswitch` (`config.h`; was `switchbota` before v0.4.1).
    If WiFi is down for a minute, the stage also opens an AP `espreswitch-xxxxxx` with a page at
    192.168.4.1 to enter a new network (kept in RAM only: NVS at `0x9000` is inside the erased region).
    The LEDs (GPIO7/8, active low) show the state, one pattern per stuck state (`espressif/main/led.c`).

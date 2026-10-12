@@ -130,7 +130,7 @@ If a conversion goes wrong, the LEDs may be all you have to go on. While the ESP
 | Pattern | Meaning | What to do |
 |---|---|---|
 | Slow blink, once a second | Looking for WiFi | Wait. After a minute it switches to the rescue network |
-| 2 blinks, pause | Can't reach WiFi; rescue network `espreswitch-xxxxxx` is up | Join it and enter a WiFi network (see below) |
+| 2 blinks, pause | No WiFi after a minute, so the plug has opened its own rescue network `espreswitch-xxxxxx` | Join it and enter a WiFi network (see below) |
 | Short blip every 2 seconds | On WiFi, but the ESPreSwitch server isn't answering properly | Check the server is running, the payload has finished downloading, and `wohand.com` resolves to it |
 | 3 blinks, long pause | Refused: the payload is too big for this plug's flash layout | Nothing was erased. Pick a smaller payload or unplug |
 | Solid | Talking to the server; about to erase or copying itself to the other slot | Wait |
@@ -153,7 +153,14 @@ Once the erase starts, the LEDs only ever show these two patterns, even if WiFi 
 The stage never drives the relay. If the button still switches the relay, the plug is running some other firmware (stock, Tasmota or ESPresense), not the stage.
 
 ### The plug can't reach WiFi
-The stage joins the WiFi network saved in the plug. If that's missing, it tries SSID `switchbota`, password `switchbota`. If it still has no WiFi after a minute, it opens its own open network named `espreswitch-xxxxxx` (the end of its MAC address):
+Two different networks are involved, so keep them apart:
+
+| Network | Created by | What it's for |
+|---|---|---|
+| `espreswitch` (password `espreswitch`) | **You**, on your router or a phone hotspot | A network the plug **joins** if it has no saved WiFi. It must resolve `wohand.com` to the ESPreSwitch server |
+| `espreswitch-xxxxxx` (open; `xxxxxx` is the end of its MAC address) | **The plug** | A rescue network the plug **opens** after a minute without WiFi, so you can give it one |
+
+The stage joins the WiFi network saved in the plug (the one you set in the SwitchBot app). Only if the plug has no saved WiFi at all does it join `espreswitch` instead. If it still has no WiFi after a minute, it opens `espreswitch-xxxxxx`:
 
 1. Join `espreswitch-xxxxxx` from a phone or laptop and browse to http://192.168.4.1.
 2. Enter a WiFi network the plug can use. That network has to resolve `wohand.com` to the ESPreSwitch server: your normal LAN with the DNS override, or any network whose DHCP hands out the server's IP as DNS.

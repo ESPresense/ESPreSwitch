@@ -26,5 +26,6 @@
 #define LED2_GPIO 8
 
 #define FALLBACK_URL "http://www.wohand.com/app.bin"
-#define FALLBACK_SSID "switchbota"
-#define FALLBACK_PASS "switchbota"
+// Joined only when the plug has no saved WiFi (e.g. a dev board, or a plug that lost its settings)
+#define FALLBACK_SSID "espreswitch"
+#define FALLBACK_PASS "espreswitch"
