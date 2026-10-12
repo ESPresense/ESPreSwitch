@@ -59,6 +59,7 @@ Writing to the bootloader over OTA is dangerous and not normally done for good r
 
 ![pfsense](./images/pfsense-setup.png)
    - In PiHole, this can be done in the Local DNS->DNS Records by setting the Domain to `www.wohand.com` and `wohand.com` and the IP to 192.168.0.69
+  - On a UniFi gateway (UDM, UDM Pro, UCG, UXG), add two **Host (A)** DNS records in UniFi Network, `wohand.com` and `www.wohand.com`, both pointing at 192.168.0.69. In Network 9.x this is Settings → Policy Engine → Policy Table → Create New Policy → DNS; in Network 8.x, Settings → Routing → DNS. UniFi records match exactly, so add both names. Power-cycle the plug afterwards so it drops any cached answer
   - If your router does not support custom DNS entries, it will almost certainly support setting a custom DNS server. This may be found in the DHCP settings or the System settings. Set the custom DNS server to 192.168.0.69
 - Run a local NodeJS server to act in place of the real firmware update server and instead deliver modified firmware files: firstly the OTA (stage) file, and then the ESPresense factory image
   - Install NodeJS on your computer https://nodejs.org/en/learn/getting-started/how-to-install-nodejs
