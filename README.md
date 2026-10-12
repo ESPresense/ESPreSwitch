@@ -24,12 +24,12 @@ Some details about the devices are as follows:
 - They are ultrasonically welded shut, requiring destruction of the plastic housing to access the circuits within. There are no screws to allow access to the internals, the way there is with the Sonoff S31
 - They use the Shanghai Belling BL0937 energy measurement IC to track power usage
 - They use the Espressif ESP32-C3 chip for WiFi, Bluetooth Low Energy (BLE), and circuit control. See [here](https://tasmota.github.io/docs/ESP32/#esp32-differences) to learn about the different types of ESP32. The MAC addresses for WiFi and BLE follow the [ESP32 standard](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/api-reference/system/misc_system_api.html#mac-address) of having an offset of two. If the WIFI-MAC is `34:85:18:0F:CC:DC`, then the BLE-MAC is `34:85:18:0F:CC:DE` (DC in hex is 220, DE is 222)
-- The upstream SwitchbOTA flashing process is confirmed to work on both device models using firmware v1.4 or older (v1.3, v1.2). ESPreSwitch uses the same stage binary and triggers, only the payload differs
+- The upstream SwitchbOTA flashing process is confirmed to work on both device models using firmware v1.4 or older (v1.3, v1.2). ESPreSwitch uses the same BLE triggers and has been confirmed on a W1901400 running stock firmware **v2.7** (2026-10-11), so newer firmware still accepts the plain-HTTP update
 
 ## Disclaimer
 Writing to the bootloader over OTA is dangerous and not normally done for good reason. If your device loses power or somehow flashes corrupted data, the device will be bricked and require disassembly to reprogram the device. Only perform this process if you are comfortable disassembling your plug to fix it if it breaks! Of course, do not unplug or otherwise disturb the plug while it is performing the OTA.
 
-**This is a proof of concept and provided with no warranty.** The ESPresense payload has not yet been tested on a stock plug. Try it first on a plug you are prepared to open.
+**This is a proof of concept and provided with no warranty.** It has converted one stock plug so far. Try it first on a plug you are prepared to open.
 
 **Already converted a plug via Tasmota?** ESPreSwitch needs the stock SwitchBot firmware; it cannot re-run on a plug that already runs Tasmota or ESPresense.
 
@@ -92,7 +92,7 @@ Writing to the bootloader over OTA is dangerous and not normally done for good r
 
 - Wait a few seconds and look at the NodeJS log to verify the command worked as it should. You should see something such as `::ffff:192.168.0.131 - /version/wocaotech/firmware/WoPlugUS/WoPlugUS_V12.bin` which indicates the NodeJS server was able to send the first `.bin` file to the plug
 - Wait about a minute after seeing the NodeJS server log to give the plug time to get ready for the next step.
-- Now send a new BYTE_ARRAY command in the BLE app (nRF Connect) with hex `57 0F 0B`. Hit Send to trigger the second and final firmware flash step
+- Now send a new BYTE_ARRAY command in the BLE app (nRF Connect) with hex `57 0F 0B`. Hit Send to trigger the second and final firmware flash step. **This step is required:** the first command only downloads the stage binary; this one makes the stock firmware install it and reboot into it. On firmware v2.7 the stage made its first request about 2.5 minutes after the first command, right after `57 0F 0B`
 - Wait a few seconds again and then look at the NodeJS log to verify the command worked as it should. You should see something such as `::ffff:192.168.0.131 - /payload.bin` which indicates the NodeJS server was able to send the ESPresense factory image to the plug
 - DONE! The firmware flashing should be complete
 

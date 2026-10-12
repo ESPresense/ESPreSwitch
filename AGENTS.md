@@ -67,7 +67,14 @@ reads the partition table at runtime, so it tolerates either of the last two lay
 - `v0.4.0` released (stage `app.bin` + `.md5`): payload info from the server, re-checked on every retry; WiFi rescue portal; LED status. CI is green.
 - `payload.json` pins `esp32c3.factory.bin` from the **ESPresense v5.0.0b1 pre-release** (release asset,
   so it doesn't expire). Writing it ends at `0x174000`, below both `0x220000` (stock) and `0x1E0000` (Tasmota v11 layout).
-- **Not yet tested on a stock plug.** Do the first run on a plug you're prepared to open.
+- **Tested end-to-end on 2026-10-11** with v0.4.0:
+  - ESP32-C3 dev board flashed with the stock partition table and the stage in `ota_0`: copied itself to
+    `ota_1`, wrote the payload and booted ESPresense v5.0.0b1 in 75 s.
+  - A real W1901400 on stock firmware **v2.7**: `57 0F 0A 01 0C` made it fetch
+    `/version/wocaotech/firmware/WoPlugUS/WoPlugUS_V12.bin`; nothing more until `57 0F 0B`, which installs
+    and reboots. The stage was already in `ota_1` (no `/app.bin` copy), wrote the payload first try,
+    and the plug came up as ESPresense.
+  - Not exercised yet: the rescue portal, the plug's LED patterns, the Tasmota v11 layout.
 
 ### Background: plugs converted via Tasmota
 
@@ -81,7 +88,8 @@ back before flashing the next.
 
 ## Open tasks
 
-- [ ] Test ESPreSwitch end-to-end on a stock plug (firmware v1.4 or older).
+- [x] Test ESPreSwitch end-to-end on a stock plug (done on firmware v2.7, 2026-10-11).
+- [ ] Test the Tasmota v11 layout path (dev board with app0 `0x10000` / app1 `0x1E0000`, or a real converted plug).
 - [ ] Re-pin `payload.json` to a stable ESPresense release once one ships `esp32c3.factory.bin`
       (currently on the v5.0.0b1 pre-release).
 - [ ] ESPresense: an `esp32c3-switchbot` flavor with the plug's relay/button/LED pin defaults
