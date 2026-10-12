@@ -17,3 +17,4 @@
 
 void wifi_init();
 int wifi_is_connected();
+void wifi_stop_persisting();  // call before erasing: NVS is inside the erased region

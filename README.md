@@ -158,15 +158,15 @@ Two different networks are involved, so keep them apart:
 | Network | Created by | What it's for |
 |---|---|---|
 | `espreswitch` (password `espreswitch`) | **You**, on your router or a phone hotspot | A network the plug **joins** if it has no saved WiFi. It must resolve `wohand.com` to the ESPreSwitch server |
-| `espreswitch-xxxxxx` (open; `xxxxxx` is the end of its MAC address) | **The plug** | A rescue network the plug **opens** after a minute without WiFi, so you can give it one |
+| `espreswitch-xxxxxx` (open; `xxxxxx` matches the `espresense-xxxxxx` network it opens once converted) | **The plug** | A rescue network the plug **opens** after a minute without WiFi, so you can give it one |
 
 The stage joins the WiFi network saved in the plug (the one you set in the SwitchBot app). Only if the plug has no saved WiFi at all does it join `espreswitch` instead. If it still has no WiFi after a minute, it opens `espreswitch-xxxxxx`:
 
-1. Join `espreswitch-xxxxxx` from a phone or laptop and browse to http://192.168.4.1.
+1. Join `espreswitch-xxxxxx` from a phone or laptop. The page should pop up by itself; if not, browse to http://192.168.4.1.
 2. Enter a WiFi network the plug can use. That network has to resolve `wohand.com` to the ESPreSwitch server: your normal LAN with the DNS override, or any network whose DHCP hands out the server's IP as DNS.
-3. The `espreswitch-xxxxxx` network disappears once the plug connects, and the flash carries on.
+3. The `espreswitch-xxxxxx` network closes as soon as you save, while the plug joins your network (one radio can't do both reliably). If the plug can't join, `espreswitch-xxxxxx` comes back in about a minute: reconnect and check the name and password.
 
-This works even after the flash is erased, as long as the plug stays powered. The new network is kept in RAM only, so a power cut loses it, but a power cut after the erase means opening the plug anyway.
+This works even after the flash is erased, as long as the plug stays powered. A network entered before the erase is saved, so it survives the plug's own reboot into its second app slot and you only enter it once. A network entered after the erase is kept in RAM only (the saved-settings area is part of what gets erased), but a power cut after the erase means opening the plug anyway.
 
 ## Updating the payload
 1. Pick an ESPresense build that publishes `esp32c3.factory.bin` (release asset or CI artifact).

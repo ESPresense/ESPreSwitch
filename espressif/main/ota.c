@@ -34,6 +34,7 @@
 
 #include "ota.h"
 #include "led.h"
+#include "wifi.h"
 
 static const char *TAG = "ota";
 
@@ -241,6 +242,7 @@ void ota_inject() {
             return;
         }
 
+        wifi_stop_persisting();
         ESP_LOGI(TAG, "erasing bootloader! don't lose power now!");
         led_set(LED_WRITING);
         ESP_ERROR_CHECK( esp_flash_erase_region(NULL, 0, write_size) );

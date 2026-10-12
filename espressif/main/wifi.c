@@ -31,6 +31,9 @@
 
 #include "lwip/err.h"
 #include "lwip/sys.h"
+#include "lwip/sockets.h"
+#include "dhcpserver/dhcpserver.h"
+#include "tcpip_adapter.h"
 
 #include "wifi.h"
 #include "config.h"
@@ -42,6 +45,7 @@ static EventGroupHandle_t s_wifi_event_group;
 
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT      BIT1
+#define WIFI_NEW_CONFIG_BIT BIT2  // portal saved a network: close the AP, then join it
 
 static void wifi_task(void *pvParameters);
 
@@ -52,6 +56,7 @@ static void wifi_task(void *pvParameters);
 #define PORTAL_RETRY_MS 30000
 static volatile bool portal_active = false;
 static httpd_handle_t portal_server = NULL;
+static void portal_dhcp_dns(void);
 
 static void wifi_set_connected(uint8_t c) {
     if (c) {
@@ -79,7 +84,7 @@ esp_err_t event_handler(void *ctx, system_event_t *event)
             break;
             
         case SYSTEM_EVENT_STA_DISCONNECTED:
-            ESP_LOGI(TAG, "event_handler: SYSTEM_EVENT_STA_DISCONNECTED");
+            ESP_LOGI(TAG, "event_handler: SYSTEM_EVENT_STA_DISCONNECTED, reason %d", event->event_info.disconnected.reason);
             // try to re-connect; with the portal up, wifi_task retries less often, because each
             // attempt scans every channel and knocks phones off the AP
             if (!portal_active) esp_wifi_connect();
@@ -89,6 +94,7 @@ esp_err_t event_handler(void *ctx, system_event_t *event)
         
         case SYSTEM_EVENT_AP_START:
             ESP_LOGI(TAG, "event_handler: SYSTEM_EVENT_AP_START");
+            if (portal_active) portal_dhcp_dns();
             break;
         
         case SYSTEM_EVENT_AP_STOP:
@@ -112,6 +118,14 @@ esp_err_t event_handler(void *ctx, system_event_t *event)
     }
     return ESP_OK;
 }
+// WiFi config is saved to NVS (so a network entered in the portal survives the reboot into ota_1)
+// until the erase starts. NVS (0x9000 or 0xE000) is inside the erased region, so from then on it
+// must only live in RAM.
+void wifi_stop_persisting()
+{
+    esp_wifi_set_storage(WIFI_STORAGE_RAM);
+}
+
 int wifi_is_connected()
 {
     return xEventGroupGetBits(s_wifi_event_group) & WIFI_CONNECTED_BIT;
@@ -123,8 +137,6 @@ void wifi_connect()
     // get default config ...
     wifi_config_t existing_config = { 0 };
     esp_wifi_get_config(WIFI_IF_STA, &existing_config);
-    // Never write WiFi config to NVS: 0x9000 is inside the region being erased and rewritten.
-    ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
     ESP_LOGI(TAG, "%s", existing_config.sta.ssid);
     if(strlen((char *)existing_config.sta.ssid) == 0 || strcmp((char *)existing_config.sta.ssid, "wocao_factory_test") == 0) {
         ESP_LOGI(TAG, "defaulting to fallback network ...");
@@ -202,54 +214,125 @@ static esp_err_t portal_save(httpd_req_t *req)
         strlcpy((char *)config.sta.password, value, sizeof(config.sta.password));
     }
 
-    ESP_LOGI(TAG, "portal: switching to network %s", (char *)config.sta.ssid);
-    esp_wifi_disconnect();
+    config.sta.pmf_cfg.capable = true;  // join PMF-optional (WPA2/WPA3 transition) networks with PMF
+    ESP_LOGI(TAG, "portal: switching to network %s (password %d chars)", (char *)config.sta.ssid,
+             (int)strlen((char *)config.sta.password));
     esp_wifi_set_config(WIFI_IF_STA, &config);
-    esp_wifi_connect();
     httpd_resp_set_type(req, "text/html");
-    return httpd_resp_send(req, "<p>Connecting. If it works, this network disappears and the flash carries on.",
-                           HTTPD_RESP_USE_STRLEN);
+    esp_err_t err = httpd_resp_send(req,
+        "<p>Saved. This network closes now while the plug joins yours. If it can't join, this network "
+        "comes back in about a minute: reconnect and check the name and password.", HTTPD_RESP_USE_STRLEN);
+    // Join from wifi_task with the AP closed: with a phone on the AP, the radio splits its time
+    // between channels and the WPA handshake times out (reason 15).
+    xEventGroupSetBits(s_wifi_event_group, WIFI_NEW_CONFIG_BIT);
+    return err;
+}
+
+// Captive portal: phones on the rescue AP get 192.168.4.1 as their DNS server, and every A query is
+// answered with 192.168.4.1, so their connectivity check lands on our page and they pop it up.
+// The plug's own lookups (wohand.com on the real WiFi) don't go through this.
+static void portal_dhcp_dns(void)
+{
+    tcpip_adapter_ip_info_t ip;
+    tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_AP, &ip);
+    tcpip_adapter_dhcps_stop(TCPIP_ADAPTER_IF_AP);
+    dhcps_offer_t offer = OFFER_DNS;
+    tcpip_adapter_dhcps_option(TCPIP_ADAPTER_OP_SET, TCPIP_ADAPTER_DOMAIN_NAME_SERVER, &offer, sizeof(offer));
+    tcpip_adapter_dns_info_t dns = { 0 };
+    dns.ip.type = IPADDR_TYPE_V4;
+    dns.ip.u_addr.ip4.addr = ip.ip.addr;
+    tcpip_adapter_set_dns_info(TCPIP_ADAPTER_IF_AP, ESP_NETIF_DNS_MAIN, &dns);
+    tcpip_adapter_dhcps_start(TCPIP_ADAPTER_IF_AP);
+}
+
+static void portal_dns_task(void *pvParameters)
+{
+    int s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    struct sockaddr_in addr = { .sin_family = AF_INET, .sin_port = htons(53), .sin_addr.s_addr = htonl(INADDR_ANY) };
+    struct timeval tv = { .tv_sec = 1 };
+    if (s < 0 || bind(s, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        ESP_LOGE(TAG, "portal: DNS server failed to start");
+        if (s >= 0) close(s);
+        vTaskDelete(NULL);
+        return;
+    }
+    setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    uint8_t buf[512];
+    while (portal_active) {
+        struct sockaddr_in from;
+        socklen_t fromlen = sizeof(from);
+        int n = recvfrom(s, buf, sizeof(buf) - 16, 0, (struct sockaddr *)&from, &fromlen);
+        if (n < 12) continue;
+        int i = 12;  // skip the question name
+        while (i < n && buf[i]) i += buf[i] + 1;
+        if (i + 5 > n) continue;
+        bool a = buf[i + 1] == 0 && buf[i + 2] == 1;
+        n = i + 5;  // header + one question; drop anything after it
+        buf[2] = 0x81; buf[3] = 0x80;          // response, no error
+        buf[4] = 0; buf[5] = 1;                // one question
+        buf[6] = 0; buf[7] = a ? 1 : 0;        // one answer for A, none otherwise
+        buf[8] = buf[9] = buf[10] = buf[11] = 0;
+        if (a) {
+            uint8_t ans[] = { 0xC0, 0x0C, 0, 1, 0, 1, 0, 0, 0, 60, 0, 4, 192, 168, 4, 1 };
+            memcpy(buf + n, ans, sizeof(ans));
+            n += sizeof(ans);
+        }
+        sendto(s, buf, n, 0, (struct sockaddr *)&from, fromlen);
+    }
+    close(s);
+    vTaskDelete(NULL);
 }
 
 static void portal_start(void)
 {
+    // Same suffix as ESPresense's own AP (espresense-xxxxxx): last three bytes of the base MAC,
+    // reversed, so both networks name the plug the same way.
     uint8_t mac[6];
-    esp_wifi_get_mac(WIFI_IF_AP, mac);
+    esp_efuse_mac_get_default(mac);
     wifi_config_t ap = { .ap = { .max_connection = 2, .authmode = WIFI_AUTH_OPEN } };
-    ap.ap.ssid_len = snprintf((char *)ap.ap.ssid, sizeof(ap.ap.ssid), "espreswitch-%02x%02x%02x", mac[3], mac[4], mac[5]);
+    ap.ap.ssid_len = snprintf((char *)ap.ap.ssid, sizeof(ap.ap.ssid), "espreswitch-%02x%02x%02x", mac[5], mac[4], mac[3]);
     portal_active = true;
     led_set(LED_PORTAL);
     esp_wifi_set_mode(WIFI_MODE_APSTA);
     esp_wifi_set_config(WIFI_IF_AP, &ap);
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    config.uri_match_fn = httpd_uri_match_wildcard;  // every GET gets the page, incl. phones' connectivity checks
     if (httpd_start(&portal_server, &config) == ESP_OK) {
-        httpd_uri_t get = { .uri = "/", .method = HTTP_GET, .handler = portal_get };
         httpd_uri_t save = { .uri = "/save", .method = HTTP_POST, .handler = portal_save };
-        httpd_register_uri_handler(portal_server, &get);
+        httpd_uri_t get = { .uri = "/*", .method = HTTP_GET, .handler = portal_get };
         httpd_register_uri_handler(portal_server, &save);
+        httpd_register_uri_handler(portal_server, &get);
     }
+    xTaskCreate(&portal_dns_task, "portalDns", 3072, NULL, 4, NULL);
     ESP_LOGI(TAG, "portal: no WiFi, opened AP %s at http://192.168.4.1", (char *)ap.ap.ssid);
 }
 
-static void portal_stop(void)
+static void portal_stop(const char *why)
 {
     if (portal_server) httpd_stop(portal_server);
     portal_server = NULL;
     esp_wifi_set_mode(WIFI_MODE_STA);
     portal_active = false;
     led_set(wifi_is_connected() ? LED_READY : LED_WIFI);
-    ESP_LOGI(TAG, "portal: WiFi back, closed AP");
+    ESP_LOGI(TAG, "portal: closed AP (%s)", why);
 }
 
 void wifi_task(void *pvParameters)
 {
     while (1) {
         TickType_t wait = (portal_active ? PORTAL_RETRY_MS : PORTAL_DELAY_MS) / portTICK_PERIOD_MS;
-        EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group, WIFI_CONNECTED_BIT, false, true, wait);
-        if (bits & WIFI_CONNECTED_BIT) {
+        EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group, WIFI_CONNECTED_BIT | WIFI_NEW_CONFIG_BIT,
+                                               false, false, wait);
+        if (bits & WIFI_NEW_CONFIG_BIT) {
+            xEventGroupClearBits(s_wifi_event_group, WIFI_NEW_CONFIG_BIT);
+            vTaskDelay(1000 / portTICK_PERIOD_MS);  // let the "Saved" page reach the phone
+            if (portal_active) portal_stop("joining the new network");
+            esp_wifi_disconnect();
+            esp_wifi_connect();  // portal reopens after PORTAL_DELAY_MS if this fails
+        } else if (bits & WIFI_CONNECTED_BIT) {
             ESP_LOGI(TAG, "networkTask: connected to access point");
-            if (portal_active) portal_stop();
+            if (portal_active) portal_stop("WiFi back");
             while (wifi_is_connected()) { vTaskDelay(1000 / portTICK_PERIOD_MS); }
         } else if (!portal_active) {
             portal_start();

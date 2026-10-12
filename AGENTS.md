@@ -18,7 +18,8 @@ own bootloader and partition table instead of Tasmota's.
    offset 0. It MD5-checks both the download and a read-back of flash, and retries until both match.
    With no saved WiFi it joins `espreswitch`/`espreswitch` (`config.h`; was `switchbota` before v0.4.1).
    If WiFi is down for a minute, the stage also opens an AP `espreswitch-xxxxxx` with a page at
-   192.168.4.1 to enter a new network (kept in RAM only: NVS at `0x9000` is inside the erased region).
+   192.168.4.1 to enter a new network. WiFi config is saved to NVS until the erase starts, then RAM only
+   (`wifi_stop_persisting()`): NVS (`0x9000` or `0xE000`) is inside the erased region.
    The LEDs (GPIO7/8, active low) show the state, one pattern per stuck state (`espressif/main/led.c`).
    Once erased, only the two erased patterns show. The README "What the LEDs mean" table must
    match `led.c`; update both together.
@@ -65,7 +66,7 @@ reads the partition table at runtime, so it tolerates either of the last two lay
 
 ## Status (2026-10-11)
 
-- `v0.4.0` released (stage `app.bin` + `.md5`): payload info from the server, re-checked on every retry; WiFi rescue portal; LED status. CI is green.
+- `v0.4.2` released (stage `app.bin` + `.md5`): payload info from the server, re-checked on every retry; WiFi rescue portal (captive, AP closes before joining, network kept until the erase); LED status. CI is green.
 - `payload.json` pins `esp32c3.factory.bin` from the **ESPresense v5.0.0b1 pre-release** (release asset,
   so it doesn't expire). Writing it ends at `0x174000`, below both `0x220000` (stock) and `0x1E0000` (Tasmota v11 layout).
 - **Tested end-to-end on 2026-10-11** with v0.4.0:
@@ -75,7 +76,10 @@ reads the partition table at runtime, so it tolerates either of the last two lay
     `/version/wocaotech/firmware/WoPlugUS/WoPlugUS_V12.bin`; nothing more until `57 0F 0B`, which installs
     and reboots. The stage was already in `ota_1` (no `/app.bin` copy), wrote the payload first try,
     and the plug came up as ESPresense.
-  - Not exercised yet: the rescue portal, the plug's LED patterns, the Tasmota v11 layout.
+  - Rescue portal (v0.4.2, C3 dev board, an ESP32-S3 posting the form): AP opened at 60 s; after the
+    save the stage closes the AP, then joins (with the AP open, the WPA handshake timed out: reason 15);
+    the network survived the reboot into `ota_1` (saved to NVS until the erase); converted at 380 s.
+  - Not exercised yet: the plug's LED patterns, the Tasmota v11 layout.
 
 ### Background: plugs converted via Tasmota
 
