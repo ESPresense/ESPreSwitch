@@ -123,6 +123,13 @@ The node downloads the stage into its other app slot and reboots into it. The st
 
 The stage needs WiFi: it joins the plug's saved network if there is one, else `espreswitch`/`espreswitch`, else it opens its rescue network (see [The plug can't reach WiFi](#the-plug-cant-reach-wifi)). Converted this way on 2026-10-11: six plugs, every write first try.
 
+### Other ESP32-C3 nodes
+The same command works on other 4 MB ESP32-C3 nodes running ESPresense, as long as their second app slot starts above `0x174000`. An Athom Plug V3 (`app0` `1835008`, `0x1C0000`) converted this way on 2026-10-12. The payload is built for the Plug Mini, so afterwards:
+
+- The node runs the plain `esp32c3` build. If its board needs another flavor (the Athom needs `esp32c3-cdc`), update it to that build.
+- Its board settings are wiped along with everything else. Apply the board's template from its page on [espresense.com](https://espresense.com/nodes/) again.
+- While the stage runs, it blinks GPIO 7 and 8, the Plug Mini's LED pins. Check nothing on your board objects to those pins being driven.
+
 ## Firmware Update Sequence Detail
 The included ESP-IDF code is a lightweight OTA client that directly writes to the embedded flash chip, enabling the install of non-app level code, including modfiying the bootloader and partiton table.
 
