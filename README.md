@@ -31,7 +31,7 @@ Writing to the bootloader over OTA is dangerous and not normally done for good r
 
 **This is a proof of concept and provided with no warranty.** It has converted one stock plug so far. Try it first on a plug you are prepared to open.
 
-**Already converted a plug via Tasmota?** ESPreSwitch needs the stock SwitchBot firmware; it cannot re-run on a plug that already runs Tasmota or ESPresense.
+**Already converted a plug via SwitchbOTA and running ESPresense on Tasmota's layout?** ESPreSwitch can move it onto ESPresense's own bootloader and layout without Bluetooth: see [Plugs already running ESPresense](#plugs-already-running-espresense).
 
 ## Part 1: Plug Setup
 
@@ -107,6 +107,19 @@ Writing to the bootloader over OTA is dangerous and not normally done for good r
 ____
 
 
+
+## Plugs already running ESPresense
+Plugs converted the SwitchbOTA way (stock → Tasmota v11.1.0 → ESPresense) still have Tasmota's bootloader and partition table. On ESPresense v5.0.0b2 or later, telemetry reports `app0`: `1900544` (`0x1D0000`) means Tasmota's layout, `1966080` (`0x1E0000`) means ESPresense's own.
+
+To move one onto ESPresense's own layout, with the ESPreSwitch server running and `wohand.com` pointed at it (Part 2), tell the node to update from the server:
+
+```
+mosquitto_pub -h <broker> -t 'espresense/rooms/<room>/update/set' -m 'http://<server-ip>/app.bin'
+```
+
+The node downloads the stage into its other app slot and reboots into it. The stage copies itself to app1 (`0x1E0000`) if it landed in app0, writes the ESPresense factory image below `0x174000`, and reboots into ESPresense. Its settings are wiped: it opens `espresense-xxxxxx`, so set it up as in Part 4. It takes about two minutes; the LEDs show progress as in [What the LEDs mean](#what-the-leds-mean).
+
+The stage needs WiFi: it joins the plug's saved network if there is one, else `espreswitch`/`espreswitch`, else it opens its rescue network (see [The plug can't reach WiFi](#the-plug-cant-reach-wifi)). Converted this way on 2026-10-11: six plugs, every write first try.
 
 ## Firmware Update Sequence Detail
 The included ESP-IDF code is a lightweight OTA client that directly writes to the embedded flash chip, enabling the install of non-app level code, including modfiying the bootloader and partiton table.

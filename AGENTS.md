@@ -79,7 +79,10 @@ reads the partition table at runtime, so it tolerates either of the last two lay
   - Rescue portal (v0.4.2, C3 dev board, an ESP32-S3 posting the form): AP opened at 60 s; after the
     save the stage closes the AP, then joins (with the AP open, the WPA handshake timed out: reason 15);
     the network survived the reboot into `ota_1` (saved to NVS until the erase); converted at 380 s.
-  - Not exercised yet: the plug's LED patterns, the Tasmota v11 layout.
+  - Tasmota v11 layout: six SwitchbOTA-converted plugs (ESPresense b2, `app0=1900544`) converted over
+    MQTT (`espresense/rooms/<room>/update/set` = `http://<server>/app.bin`). Five landed in app0 and
+    copied to app1 at `0x1E0000`; one (master) was already in app1 and wrote directly. All first try.
+  - Not exercised yet: the plug's LED patterns.
 
 ### Background: plugs converted via Tasmota
 
@@ -94,7 +97,7 @@ back before flashing the next.
 ## Open tasks
 
 - [x] Test ESPreSwitch end-to-end on a stock plug (done on firmware v2.7, 2026-10-11).
-- [ ] Test the Tasmota v11 layout path (dev board with app0 `0x10000` / app1 `0x1E0000`, or a real converted plug).
+- [x] Test the Tasmota v11 layout path (six real plugs, 2026-10-11).
 - [ ] Re-pin `payload.json` to a stable ESPresense release once one ships `esp32c3.factory.bin`
       (currently on the v5.0.0b1 pre-release).
 - [ ] ESPresense: an `esp32c3-switchbot` flavor with the plug's relay/button/LED pin defaults
