@@ -75,6 +75,8 @@ Writing to the bootloader over OTA is dangerous and not normally done for good r
 
 - **TL;DR: Send BLE commands to the SwitchBot plug to trigger the firmware upgrade process**
 - If you saw an upgrade button in the SwitchBot app, it is now safe to hit that button. No additional actions should be needed, and the firmware replacement process should complete. If no button is present in the SwitchBot app, proceed
+- **Easiest: use [espresense.com/espreswitch](https://espresense.com/espreswitch/)** in Chrome or Edge on desktop or Android. It finds the plug over Bluetooth and sends both commands for you: press **1. Install**, then **2. Reboot** about a minute after the server logs `WoPlugUS_V12.bin`. iPhone Safari has no Web Bluetooth; use Bluefy, or the nRF Connect steps below
+- Otherwise, send the commands yourself:
 - Install an app such as [nRF Connect for Mobile](https://play.google.com/store/apps/details?id=no.nordicsemi.android.mcp). This will be used to connect to the Bluetooth Low Energy (BLE) radio of the plug to trigger the firmware update process. [Bluetility for Mac](https://github.com/jnross/Bluetility) is also reported to work
 - Follow the instructions below, or watch [the video](https://youtu.be/iTexFQ0Th0I?si=zB-leDeiz82yL9Cy&t=635), or read the GitHub issues outlining the process https://github.com/kendallgoto/switchbota/issues/43  https://github.com/kendallgoto/switchbota/issues/3#issuecomment-1121864522
 - Using the BLE app of choice, scan for devices and Connect to the device matching the BLE-MAC noted from the SwitchBot app
