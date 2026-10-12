@@ -27,9 +27,9 @@ Some details about the devices are as follows:
 - The upstream SwitchbOTA flashing process is confirmed to work on both device models using firmware v1.4 or older (v1.3, v1.2). ESPreSwitch uses the same BLE triggers and has been confirmed on a W1901400 running stock firmware **v2.7** (2026-10-11), so newer firmware still accepts the plain-HTTP update
 
 ## Disclaimer
-Writing to the bootloader over OTA is dangerous and not normally done for good reason. If your device loses power or somehow flashes corrupted data, the device will be bricked and require disassembly to reprogram the device. Only perform this process if you are comfortable disassembling your plug to fix it if it breaks! Of course, do not unplug or otherwise disturb the plug while it is performing the OTA.
+Writing to the bootloader over OTA is dangerous and not normally done for good reason. If your device loses power or somehow flashes corrupted data, the device will be bricked. The case is ultrasonically welded, so the only fix is cutting it open and reflashing over serial, and the plug is rarely usable as a plug afterwards. Treat a bricked plug as lost. Of course, do not unplug or otherwise disturb the plug while it is performing the OTA.
 
-**This is a proof of concept and provided with no warranty.** It has converted one stock plug so far. Try it first on a plug you are prepared to open.
+**This is a proof of concept and provided with no warranty.** As of 2026-10-11 it has converted two stock plugs and six plugs already running ESPresense, every one first try. Still, only use it on plugs you can afford to lose.
 
 **Already converted a plug via SwitchbOTA and running ESPresense on Tasmota's layout?** ESPreSwitch can move it onto ESPresense's own bootloader and layout without Bluetooth: see [Plugs already running ESPresense](#plugs-already-running-espresense).
 
@@ -157,13 +157,13 @@ If a conversion goes wrong, the LEDs may be all you have to go on. While the ESP
 | Fast blink, 5 times a second | Writing ESPresense | Wait; it reboots into ESPresense when done |
 | 5 fast blinks, pause | A write attempt failed (WiFi dropped, server unreachable, or checksum mismatch); retrying | Keep it powered. Check the server. If WiFi is the problem, the rescue network still appears after a minute |
 
-Once the erase starts, the LEDs only ever show these two patterns, even if WiFi drops, so "don't unplug" is always visible. Losing power while they show is the one thing that means opening the plug.
+Once the erase starts, the LEDs only ever show these two patterns, even if WiFi drops, so "don't unplug" is always visible. Losing power while they show is the one thing that bricks the plug.
 
 **Other states**
 
 - **Stock SwitchBot behaviour:** the stage isn't running yet.
 - **Dark, with an open `espresense-…` WiFi network:** the conversion worked. ESPresense is running with no LED pins configured.
-- **Dark, with no network at all:** the plug isn't booting. If it went dark while the erased patterns were showing, it lost power mid-write and needs opening.
+- **Dark, with no network at all:** the plug isn't booting. If it went dark while the erased patterns were showing, it lost power mid-write and is bricked.
 
 The stage never drives the relay. If the button still switches the relay, the plug is running some other firmware (stock, Tasmota or ESPresense), not the stage.
 
@@ -181,7 +181,7 @@ The stage joins the WiFi network saved in the plug (the one you set in the Switc
 2. Enter a WiFi network the plug can use. That network has to resolve `wohand.com` to the ESPreSwitch server: your normal LAN with the DNS override, or any network whose DHCP hands out the server's IP as DNS.
 3. The `espreswitch-xxxxxx` network closes as soon as you save, while the plug joins your network (one radio can't do both reliably). If the plug can't join, `espreswitch-xxxxxx` comes back in about a minute: reconnect and check the name and password.
 
-This works even after the flash is erased, as long as the plug stays powered. A network entered before the erase is saved, so it survives the plug's own reboot into its second app slot and you only enter it once. A network entered after the erase is kept in RAM only (the saved-settings area is part of what gets erased), but a power cut after the erase means opening the plug anyway.
+This works even after the flash is erased, as long as the plug stays powered. A network entered before the erase is saved, so it survives the plug's own reboot into its second app slot and you only enter it once. A network entered after the erase is kept in RAM only (the saved-settings area is part of what gets erased), but a power cut after the erase bricks the plug anyway.
 
 ## Updating the payload
 1. Pick an ESPresense build that publishes `esp32c3.factory.bin` (release asset or CI artifact).
