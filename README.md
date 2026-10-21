@@ -100,10 +100,10 @@ Writing to the bootloader over OTA is dangerous and not normally done for good r
 
 ## Part 4: ESPresense Setup
 
-- **TL;DR: Join the plug's `espresense-…` WiFi, enter your WiFi and MQTT details, then set the plug's pins**
+- **TL;DR: Join the plug's `espresense-…` WiFi, enter your WiFi and MQTT details, then apply the plug's template**
 - The stage binary wipes the start of flash, so the plug boots ESPresense with no settings. It opens an open WiFi network named `espresense-` followed by its MAC address. Join it from a phone or laptop; the captive portal opens (or browse to http://192.168.4.1)
 - Enter your WiFi network, MQTT broker and room name, then save. The plug reboots, joins your network and appears in ESPresense-companion / Home Assistant like any other node
-- Open the node's web page, go to **Hardware**, and set the relay, button and LED pins for the plug. The Plug Mini's GPIO map is in the [Blakadder template](https://templates.blakadder.com/switchbot_plugmini_W1901400.html)
+- Copy the template from the [SwitchBot Plug Mini page](https://espresense.com/nodes/switchbot-plug-mini/) on espresense.com. On the node's web page, paste it into the **Board Template** box on the **Templates** page, then Preview and Apply. That sets the relay, button, both LEDs and the power meter in one go
 - From here on, update the plug like any other ESPresense node. Use the plain `esp32c3` firmware; the plug has no USB, so `-cdc` builds buy nothing
 
 ____
@@ -210,11 +210,14 @@ ESPreSwitch is a fork of [SwitchbOTA](https://github.com/kendallgoto/switchbota)
   - Discussion on OTA and BLE procedure https://github.com/kendallgoto/switchbota/issues/3
   - Discussion on Tasmota version and incompatibility with ESPHome https://github.com/kendallgoto/switchbota/issues/31
   - Recent write-up on the flashing process https://github.com/kendallgoto/switchbota/issues/43
+- ESPresense
+  - Documentation https://espresense.com/
+  - ESPresense settings template for the Plug Mini https://espresense.com/nodes/switchbot-plug-mini/
 - Tasmota
   - Documentation https://tasmota.github.io/docs/
   - GitHub https://github.com/arendst/Tasmota
   - Firmware (ESP32-specific) https://ota.tasmota.com/tasmota32/release/
-  - Template for SwitchBot https://templates.blakadder.com/switchbot_plugmini_W1901400.html
+  - Tasmota template (GPIO map) for the Plug Mini https://templates.blakadder.com/switchbot_plugmini_W1901400.html
 - SwitchBot App
   - Google Play Store https://play.google.com/store/apps/details?id=com.theswitchbot.switchbot
   - iOS https://apps.apple.com/us/app/switchbot/id1087374760
